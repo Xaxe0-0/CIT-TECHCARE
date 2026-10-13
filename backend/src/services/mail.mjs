@@ -26,8 +26,10 @@ export async function sendMail(to, subject, text, demo) {
     // Port 465 is TLS from the first byte; other ports must upgrade with STARTTLS.
     secure: port === 465,
     requireTLS: port !== 465,
-    connectionTimeout: 10000,
-    socketTimeout: 10000,
+    // Some providers (Titan) take about 15 seconds to send their greeting.
+    connectionTimeout: 20000,
+    greetingTimeout: 30000,
+    socketTimeout: 30000,
     auth: process.env.TECHCARE_SMTP_USER
       ? { user: process.env.TECHCARE_SMTP_USER, pass: process.env.TECHCARE_SMTP_PASSWORD }
       : undefined,
