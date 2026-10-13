@@ -630,3 +630,154 @@ button.inbox-row:hover,
 .own-question .action-link {
   margin-top: 10px;
 }
+
+/* TechCare brand colours from the logo: blue speech bubble and teal pixels. */
+:root {
+  --brand-blue: #0a68fc;
+  --brand-blue-hover: #0852c9;
+  --brand-teal: #00cacc;
+  /* Teal dark enough for text and large type on the light surface. */
+  --brand-teal-text: #00797b;
+}
+:root[data-theme='dark'] {
+  --brand-teal-text: #2fd9db;
+}
+.brand > span > span,
+:root[data-theme='dark'] .brand > span > span {
+  color: var(--brand-teal-text);
+}
+.badge.brand {
+  background: color-mix(in srgb, var(--brand-teal) 16%, transparent);
+  color: var(--brand-teal-text);
+}
+
+/* Count badges stay perfect circles for one digit and grow into pills for more. */
+.notification-count,
+.inbox-unread {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.3rem;
+  height: 1.3rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--brand-blue);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.notification-count {
+  top: -0.25rem;
+  right: -0.25rem;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+
+/* Member card: Follow and friend action share a row; Message spans it; Block is a quiet link. */
+:root[data-theme] .member-card .member-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+:root[data-theme] .member-card .member-actions .button {
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 6px 10px;
+  font-size: 14px;
+  line-height: 1.2;
+  white-space: normal;
+}
+:root[data-theme] .member-card .member-actions .member-message {
+  grid-column: 1 / -1;
+}
+:root[data-theme] .member-card .member-actions .member-block {
+  grid-column: 1 / -1;
+  justify-self: end;
+  min-height: 32px;
+  padding: 4px 6px;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+:root[data-theme] .member-card .member-actions .member-block:hover {
+  color: var(--danger);
+  text-decoration: underline;
+}
+
+/* Conversation: your messages in brand-blue bubbles on the right, theirs neutral on the left. */
+:root[data-theme] .message-history {
+  gap: 10px;
+  padding: 12px 4px;
+}
+:root[data-theme] .message {
+  max-width: min(75%, 520px);
+  padding: 10px 14px 8px;
+  border-radius: 18px;
+}
+:root[data-theme] .message.received {
+  align-self: flex-start;
+  background: var(--pearl);
+  border-bottom-left-radius: 6px;
+}
+:root[data-theme] .message.sent {
+  align-self: flex-end;
+  background: var(--brand-blue);
+  border-bottom-right-radius: 6px;
+}
+:root[data-theme] .message p {
+  margin: 0 0 4px;
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.45;
+}
+:root[data-theme] .message.sent p {
+  color: #fff;
+}
+.message-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+:root[data-theme] .message .message-meta small {
+  color: var(--muted);
+  font-size: 11px;
+}
+:root[data-theme] .message.sent .message-meta small {
+  color: rgb(255 255 255 / 85%);
+}
+.message-report {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.message-report:hover {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
+}
+.conversation-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.report-form h3 {
+  margin-bottom: 4px;
+}
+.report-form p {
+  margin-bottom: 12px;
+}
