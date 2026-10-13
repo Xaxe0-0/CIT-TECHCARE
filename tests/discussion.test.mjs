@@ -208,6 +208,71 @@ try {
     assert.equal(one('SELECT count(*) AS n FROM post_votes').n, 0);
     assert.equal(one('SELECT count(*) AS n FROM pragma_foreign_key_check').n, 0);
   });
+  await test('editing cannot republish a staff-removed comment or skip review of a pending one', async () => {
+    const created = await call(
+      'comments',
+      { post_id: 2, body: 'A comment staff will remove.' },
+      sessions.member,
+    );
+    assert.equal(created.status, 201);
+    assert.equal(
+      (
+        await call(
+          'content-reports',
+          { kind: 'comment', id: created.data.id, reason: 'Spam link' },
+          sessions.admin,
+        )
+      ).status,
+      200,
+    );
+    const report = one('SELECT id FROM content_reports WHERE target=?', created.data.id);
+    assert.equal(
+      (
+        await call(
+          'content-reports/resolve',
+          { id: report.id, action: 'remove' },
+          sessions.moderator,
+        )
+      ).status,
+      200,
+    );
+    const { revision } = one('SELECT revision FROM comments WHERE id=?', created.data.id);
+    assert.equal(
+      (
+        await call(
+          'comments',
+          { id: created.data.id, revision, body: 'Sneaking the removed comment back.' },
+          sessions.member,
+        )
+      ).status,
+      403,
+    );
+    assert.equal(one('SELECT status FROM comments WHERE id=?', created.data.id).status, 'rejected');
+    assert.equal(
+      (await call('comments', { id: created.data.id, revision, action: 'delete' }, sessions.member))
+        .status,
+      201,
+    );
+    assert.equal(one('SELECT status FROM comments WHERE id=?', created.data.id).status, 'rejected');
+    const pending = Number(
+      run(
+        "INSERT INTO comments(post_id,user_id,body,status,created) VALUES(2,?,'Older pending comment','pending',?)",
+        ids.member,
+        now(),
+      ).lastInsertRowid,
+    );
+    assert.equal(
+      (
+        await call(
+          'comments',
+          { id: pending, revision: 1, body: 'Edited pending comment.' },
+          sessions.member,
+        )
+      ).status,
+      201,
+    );
+    assert.equal(one('SELECT status FROM comments WHERE id=?', pending).status, 'pending');
+  });
 } finally {
   closeDatabases();
   const child = relative(tmpdir(), temporary);

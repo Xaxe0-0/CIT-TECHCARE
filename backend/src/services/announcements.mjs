@@ -122,17 +122,19 @@ export async function changeAnnouncement(d, me) {
           await one('SELECT coalesce(max(position),0)+1 AS next FROM announcements')
         ).next;
         id = Number(
-          await run(
-            'INSERT INTO announcements(title,description,image,alt,date,link,status,position,created) VALUES(?,?,?,?,?,?,?,?,?)',
-            title,
-            description,
-            image,
-            alt,
-            date,
-            link,
-            status,
-            position,
-            now(),
+          (
+            await run(
+              'INSERT INTO announcements(title,description,image,alt,date,link,status,position,created) VALUES(?,?,?,?,?,?,?,?,?)',
+              title,
+              description,
+              image,
+              alt,
+              date,
+              link,
+              status,
+              position,
+              now(),
+            )
           ).lastInsertRowid,
         );
       }

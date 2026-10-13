@@ -10,7 +10,7 @@ let sqliteAsyncBusy = false;
 let sqliteAsyncTail = Promise.resolve();
 const useSQLiteTests = () =>
   process.env.NODE_ENV !== 'production' && process.env.TECHCARE_TEST_SQLITE === '1';
-const useMySQL = () => !useSQLiteTests();
+export const useMySQL = () => !useSQLiteTests();
 
 export function assertDatabaseConfig() {
   if (process.env.NODE_ENV === 'production' && process.env.TECHCARE_DB_DRIVER === 'sqlite')

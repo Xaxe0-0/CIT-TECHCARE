@@ -165,6 +165,14 @@ try {
         );
         assert.equal(r.status, 503);
         assert.equal(r.data.development_code, undefined);
+        // A spoofed loopback Host must not enable classroom codes on a LAN-configured origin.
+        process.env.TECHCARE_ORIGIN = 'http://192.0.2.10:3000';
+        try {
+          assert.equal((await call(guest, 'settings')).data.classroom, false);
+        } finally {
+          process.env.TECHCARE_ORIGIN = origin;
+        }
+        assert.equal((await call(guest, 'settings')).data.classroom, true);
       },
     );
     await t.test('CSRF rejects missing/foreign origin and missing custom header', async () => {
@@ -481,6 +489,18 @@ try {
           (await call(b, avatar.replace('/api/', ''))).headers.get('content-type'),
           'image/webp',
         );
+        const replaced = await call(b, 'profile', {
+          name: 'Bea Test',
+          bio: 'A private introduction',
+          visibility: 'private',
+          picture: pic,
+        });
+        assert.equal(replaced.status, 200);
+        assert.equal(
+          one('SELECT 1 FROM media WHERE name=?', avatar.replace('/api/media/', '')),
+          undefined,
+        );
+        avatar = replaced.data.user.avatar;
       },
     );
     await t.test(
@@ -733,19 +753,22 @@ try {
           400,
         );
         assert.equal((await call(b, 'profile', { name: 'x'.repeat(81) })).status, 400);
-        const r = await handle(
-          new Request(origin + '/api/posts', {
-            method: 'POST',
-            headers: {
-              cookie: `${CONSENT_COOKIE}=${CONSENT_VERSION}`,
-              origin,
-              'content-type': 'application/json',
-              'x-techcare-request': '1',
-            },
-            body: 'not json',
-          }),
-        );
-        assert.equal(r.status, 400);
+        const malformed = (cookie) =>
+          handle(
+            new Request(origin + '/api/posts', {
+              method: 'POST',
+              headers: {
+                cookie: `${cookie}; ${CONSENT_COOKIE}=${CONSENT_VERSION}`,
+                origin,
+                'content-type': 'application/json',
+                'x-techcare-request': '1',
+              },
+              body: 'not json',
+            }),
+          );
+        assert.equal((await malformed(b.cookie)).status, 400);
+        // Upload-sized bodies are refused before buffering when the caller cannot use them.
+        assert.equal((await malformed('')).status, 401);
         const huge = await handle(
           new Request(origin + '/api/login', {
             method: 'POST',

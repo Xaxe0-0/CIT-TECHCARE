@@ -188,9 +188,13 @@ export function assertConfig() {
 }
 export function demoMode(request) {
   assertConfig();
+  // The Host header is client-controlled, so the operator-configured origin must be loopback too.
+  const loopback = (url) => ['localhost', '127.0.0.1', '[::1]'].includes(new URL(url).hostname);
   return (
     process.env.TECHCARE_DEV_VERIFY === '1' &&
-    ['localhost', '127.0.0.1', '[::1]'].includes(new URL(request.url).hostname) &&
+    Boolean(process.env.TECHCARE_ORIGIN) &&
+    loopback(process.env.TECHCARE_ORIGIN) &&
+    loopback(request.url) &&
     (!request.headers.has('x-forwarded-for') ||
       ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(request.headers.get('x-forwarded-for'))) &&
     !request.headers.has('forwarded')

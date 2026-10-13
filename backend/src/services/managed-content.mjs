@@ -219,7 +219,7 @@ export async function changeManagedContent(kind, d, me, staffCreate = false) {
         // Keep identities stable after deletion, including for an editor still open in another tab.
         id = (
           await one(
-            `SELECT max(value)+1 AS id FROM (SELECT coalesce(max(id),0) AS value FROM ${kind} UNION ALL SELECT coalesce(max(target),0) FROM audit WHERE kind=?)`,
+            `SELECT max(value)+1 AS id FROM (SELECT coalesce(max(id),0) AS value FROM ${kind} UNION ALL SELECT coalesce(max(target),0) FROM audit WHERE kind=?) AS ids`,
             kind,
           )
         ).id;

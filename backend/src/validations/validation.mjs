@@ -45,6 +45,7 @@ export function httpsURL(value) {
 export function page(url) {
   const n = Number(url.searchParams.get('page') || 1);
   if (!Number.isInteger(n) || n < 1 || n > 100000) throw new Problem('Invalid page.');
+  // offset is inlined into SQL: mysql2 binds numbers as DOUBLE, which MySQL 8.0.22+ rejects for OFFSET.
   return { number: n, offset: (n - 1) * 20 };
 }
 export function publicDescription(value) {

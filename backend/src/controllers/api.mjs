@@ -30,7 +30,12 @@ import {
 } from '../middleware/auth.mjs';
 import * as v from '../validations/validation.mjs';
 import { sendMail } from '../services/mail.mjs';
-import { readMedia, saveMedia, discardQuestionMedia } from '../services/media.mjs';
+import {
+  readMedia,
+  saveMedia,
+  discardQuestionMedia,
+  discardProfileMedia,
+} from '../services/media.mjs';
 import sharp from 'sharp';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -118,26 +123,37 @@ export async function handle(request) {
     // Single-node pilot: untrusted forwarded addresses are never used as identities.
     // A global source ceiling complements persistent per-account limits.
     await throttle('source:mutations', 600, 60);
-    const d = await body(
-      request,
-      ['profile', 'resource', 'admin/resources', 'admin/hero'].includes(path)
-        ? 33000000
-        : ['admin/guides', 'lost-found'].includes(path)
-          ? 82000000
-          : ['admin/logo', 'admin/announcements', 'admin/booths', 'posts', 'comments'].includes(
-                path,
-              )
+    // Sized for the endpoint's own file limits: 3 MB images and 20 MB videos, base64-encoded.
+    const limit = ['resource', 'admin/resources', 'admin/hero'].includes(path)
+      ? 33000000
+      : path === 'admin/guides'
+        ? 82000000
+        : path === 'lost-found'
+          ? 16100000
+          : [
+                'profile',
+                'admin/logo',
+                'admin/announcements',
+                'admin/booths',
+                'posts',
+                'comments',
+              ].includes(path)
             ? 4100000
-            : 32768,
-    );
+            : 32768;
+    // Never buffer a large upload for a caller the endpoint would reject anyway.
+    if (limit > 32768)
+      requireUser(
+        me,
+        path.startsWith('admin/') ? ['admin'] : path === 'resource' ? staff : undefined,
+      );
+    const d = await body(request, limit);
     const response = await post(path, d, me, request);
     if (response.ok) {
-      const type =
-        ['login', 'logout', 'reset-password', 'profile', 'admin/role'].includes(path)
-          ? 'session'
-          : ['admin/logo', 'admin/hero'].includes(path)
-            ? 'settings'
-            : 'invalidate';
+      const type = ['login', 'logout', 'reset-password', 'profile', 'admin/role'].includes(path)
+        ? 'session'
+        : ['admin/logo', 'admin/hero'].includes(path)
+          ? 'settings'
+          : 'invalidate';
       publishRealtime(type);
     }
     return response;
@@ -250,9 +266,8 @@ async function get(path, url, me, request) {
     return json({
       ...paginated(
         await all(
-          'SELECT id,title,status,category,created,photo FROM posts WHERE user_id=? ORDER BY created DESC,id DESC LIMIT 21 OFFSET ?',
+          `SELECT id,title,status,category,created,photo FROM posts WHERE user_id=? ORDER BY created DESC,id DESC LIMIT 21 OFFSET ${page.offset}`,
           me.id,
-          page.offset,
         ),
         'posts',
         page,
@@ -266,9 +281,8 @@ async function get(path, url, me, request) {
     const members = await Promise.all(
       (
         await all(
-          'SELECT * FROM users WHERE verified=1 AND name LIKE ? ORDER BY name,id LIMIT 21 OFFSET ?',
+          `SELECT * FROM users WHERE verified=1 AND name LIKE ? ORDER BY name,id LIMIT 21 OFFSET ${page.offset}`,
           `%${q}%`,
-          page.offset,
         )
       ).map((u) => member(u, me)),
     );
@@ -294,12 +308,11 @@ async function get(path, url, me, request) {
       category = url.searchParams.get('category') || '';
     if (category) v.choice(category, v.categories, 'category');
     const rows = await all(
-      `SELECT p.*,u.name,u.role,${publicAvatar},${voteColumns('post', 'p')},(SELECT count(*) FROM comments c LEFT JOIN comments root ON root.id=c.root_id WHERE c.post_id=p.id AND c.status='published' AND c.deleted=0 AND (root.id IS NULL OR root.status='published')) AS replies,CASE WHEN COALESCE((SELECT MAX(c.created) FROM comments c LEFT JOIN comments root ON root.id=c.root_id WHERE c.post_id=p.id AND c.status='published' AND c.deleted=0 AND (root.id IS NULL OR root.status='published')),p.created)>p.created THEN (SELECT MAX(c.created) FROM comments c LEFT JOIN comments root ON root.id=c.root_id WHERE c.post_id=p.id AND c.status='published' AND c.deleted=0 AND (root.id IS NULL OR root.status='published')) ELSE p.created END AS lastActivity FROM posts p JOIN users u ON p.user_id=u.id WHERE p.status='published' AND (p.title LIKE ? OR p.body LIKE ? OR p.category LIKE ?) AND (?='' OR p.category=?) ORDER BY ${sort === 'top' ? 'score DESC,' : ''}p.created DESC,p.id DESC LIMIT 21 OFFSET ?`,
+      `SELECT p.*,u.name,u.role,${publicAvatar},${voteColumns('post', 'p')},(SELECT count(*) FROM comments c LEFT JOIN comments root ON root.id=c.root_id WHERE c.post_id=p.id AND c.status='published' AND c.deleted=0 AND (root.id IS NULL OR root.status='published')) AS replies,CASE WHEN COALESCE((SELECT MAX(c.created) FROM comments c LEFT JOIN comments root ON root.id=c.root_id WHERE c.post_id=p.id AND c.status='published' AND c.deleted=0 AND (root.id IS NULL OR root.status='published')),p.created)>p.created THEN (SELECT MAX(c.created) FROM comments c LEFT JOIN comments root ON root.id=c.root_id WHERE c.post_id=p.id AND c.status='published' AND c.deleted=0 AND (root.id IS NULL OR root.status='published')) ELSE p.created END AS lastActivity FROM posts p JOIN users u ON p.user_id=u.id WHERE p.status='published' AND (p.title LIKE ? OR p.body LIKE ? OR p.category LIKE ?) AND (?='' OR p.category=?) ORDER BY ${sort === 'top' ? 'score DESC,' : ''}p.created DESC,p.id DESC LIMIT 21 OFFSET ${page.offset}`,
       me?.id || 0,
       ...Array(3).fill(`%${q}%`),
       category,
       category,
-      page.offset,
     );
     return json(paginated(rows, 'posts', page));
   }
@@ -328,10 +341,9 @@ async function get(path, url, me, request) {
     return json(
       paginated(
         await all(
-          "SELECT id,title,description,category,type,url,cover,author,created FROM resources WHERE status='published' AND (?='' OR type=?) ORDER BY created DESC,id DESC LIMIT 21 OFFSET ?",
+          `SELECT id,title,description,category,type,url,cover,author,created FROM resources WHERE status='published' AND (?='' OR type=?) ORDER BY created DESC,id DESC LIMIT 21 OFFSET ${page.offset}`,
           url.searchParams.get('type') || '',
           url.searchParams.get('type') || '',
-          page.offset,
         ),
         'resources',
         page,
@@ -341,12 +353,11 @@ async function get(path, url, me, request) {
     const filter = url.searchParams.get('kind') || '';
     if (filter) v.choice(filter, ['lost', 'found', 'returned'], 'notice filter');
     const rows = await all(
-      "SELECT id,kind,item,details,location,created,photos,event_date,returned,user_id=? AS own FROM lost_found WHERE status='published' AND (?='' OR (?='returned' AND returned=1) OR (kind=? AND returned=0)) ORDER BY created DESC,id DESC LIMIT 21 OFFSET ?",
+      `SELECT id,kind,item,details,location,created,photos,event_date,returned,user_id=? AS own FROM lost_found WHERE status='published' AND (?='' OR (?='returned' AND returned=1) OR (kind=? AND returned=0)) ORDER BY created DESC,id DESC LIMIT 21 OFFSET ${page.offset}`,
       me?.id || 0,
       filter,
       filter,
       filter,
-      page.offset,
     );
     return json(
       paginated(
@@ -382,14 +393,12 @@ async function get(path, url, me, request) {
     const pattern = '%' + query.replace(/[!%_]/g, (character) => '!' + character) + '%';
     const rows = query
       ? await all(
-          "SELECT id,name,email,role,verified FROM users WHERE name LIKE ? ESCAPE '!' OR email LIKE ? ESCAPE '!' ORDER BY name COLLATE NOCASE,id LIMIT 21 OFFSET ?",
+          `SELECT id,name,email,role,verified FROM users WHERE name LIKE ? ESCAPE '!' OR email LIKE ? ESCAPE '!' ORDER BY name COLLATE NOCASE,id LIMIT 21 OFFSET ${page.offset}`,
           pattern,
           pattern,
-          page.offset,
         )
       : await all(
-          "SELECT id,name,email,role,verified FROM users WHERE role IN ('admin','moderator') ORDER BY role,name COLLATE NOCASE,id LIMIT 21 OFFSET ?",
-          page.offset,
+          `SELECT id,name,email,role,verified FROM users WHERE role IN ('admin','moderator') ORDER BY role,name COLLATE NOCASE,id LIMIT 21 OFFSET ${page.offset}`,
         );
     return json(paginated(rows, 'users', page));
   }
@@ -614,6 +623,8 @@ async function post(path, d, me, request) {
       avatar,
       me.id,
     );
+    // Replaced pictures would otherwise count against the upload allowance forever.
+    if (avatar !== me.avatar) await discardProfileMedia(me.avatar, me.id);
     return json({ user: ownUser(await one('SELECT * FROM users WHERE id=?', me.id)) });
   }
   if (path === 'follow') {

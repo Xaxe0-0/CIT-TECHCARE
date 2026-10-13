@@ -48,12 +48,11 @@ export async function listComments(url, me) {
     FROM comments c JOIN users u ON u.id=c.user_id LEFT JOIN comments parent ON parent.id=c.parent_id
     LEFT JOIN users parentUser ON parentUser.id=parent.user_id
     WHERE c.post_id=? AND c.status='published' AND ${root ? 'c.root_id=?' : 'c.root_id IS NULL'}
-    ORDER BY c.created,c.id LIMIT 21 OFFSET ?`,
+    ORDER BY c.created,c.id LIMIT 21 OFFSET ${page.offset}`,
     me?.id || 0,
     me?.id || 0,
     post,
     ...(root ? [root] : []),
-    page.offset,
   );
   return {
     comments: rows.slice(0, 20),
@@ -72,6 +71,9 @@ export async function saveComment(d, me) {
   const editing = d.id ? await one('SELECT * FROM comments WHERE id=?', v.id(d.id)) : null;
   if (d.id && (!editing || editing.user_id !== me.id || editing.deleted))
     throw new Problem('You can edit only your own comments.', 403);
+  // Staff removals are final: the author may delete the comment but not republish it by editing.
+  if (editing?.status === 'rejected' && d.action !== 'delete')
+    throw new Problem('A moderator removed this comment, so it can no longer be edited.', 403);
   if (editing && Number(d.revision) !== editing.revision)
     throw new Problem('This comment changed. Refresh before editing again.', 409);
   const post = editing?.post_id || v.id(d.post_id);
@@ -94,7 +96,7 @@ export async function saveComment(d, me) {
         d.file || (editing?.photo && d.removePhoto !== '1') ? 0 : 3,
         1000,
       );
-  const status = removing ? editing?.status : 'published';
+  const status = editing ? editing.status : 'published';
   if (removing && !editing) throw new Problem('Choose your comment.');
   let uploaded = '';
   let photo = removing || d.removePhoto === '1' ? '' : editing?.photo || '';
@@ -190,15 +192,20 @@ export async function saveLost(d, me) {
 export async function communityGet(path, url, me) {
   if (path === 'notifications') {
     requireUser(me);
-    return {
-      notifications: await all(
-        `SELECT n.id,n.seen,c.post_id,c.id AS comment_id,c.root_id,u.name,p.title,
-      1+(SELECT count(*) FROM comments earlier WHERE earlier.post_id=c.post_id AND earlier.root_id IS NULL AND earlier.status='published' AND (earlier.created<root.created OR (earlier.created=root.created AND earlier.id<root.id)))/20 AS page FROM notifications n
+    const rows = await all(
+      `SELECT n.id,n.seen,c.post_id,c.id AS comment_id,c.root_id,u.name,p.title,
+      (SELECT count(*) FROM comments earlier WHERE earlier.post_id=c.post_id AND earlier.root_id IS NULL AND earlier.status='published' AND (earlier.created<root.created OR (earlier.created=root.created AND earlier.id<root.id))) AS preceding FROM notifications n
       JOIN comments c ON c.id=n.comment_id JOIN users u ON u.id=c.user_id JOIN posts p ON p.id=c.post_id
       LEFT JOIN comments root ON root.id=c.root_id WHERE n.user_id=? AND c.status='published' AND c.deleted=0
       AND p.status='published' AND (root.id IS NULL OR root.status='published') ORDER BY n.id DESC LIMIT 50`,
-        me.id,
-      ),
+      me.id,
+    );
+    // Computed here: MySQL's "/" is decimal division, so SQL would yield pages like 1.25.
+    return {
+      notifications: rows.map(({ preceding, ...row }) => ({
+        ...row,
+        page: 1 + Math.floor(preceding / 20),
+      })),
     };
   }
   if (path === 'content-reports') {
