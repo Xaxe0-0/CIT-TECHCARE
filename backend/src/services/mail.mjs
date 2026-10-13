@@ -19,11 +19,13 @@ export async function sendMail(to, subject, text, demo) {
   if (demo) return;
   if (!process.env.TECHCARE_SMTP_HOST || !process.env.TECHCARE_SMTP_FROM)
     throw new Problem('Email delivery is not configured. Please contact the project team.', 503);
+  const port = Number(process.env.TECHCARE_SMTP_PORT || 587);
   const transport = nodemailer.createTransport({
     host: process.env.TECHCARE_SMTP_HOST,
-    port: Number(process.env.TECHCARE_SMTP_PORT || 587),
-    secure: false,
-    requireTLS: true,
+    port,
+    // Port 465 is TLS from the first byte; other ports must upgrade with STARTTLS.
+    secure: port === 465,
+    requireTLS: port !== 465,
     connectionTimeout: 10000,
     socketTimeout: 10000,
     auth: process.env.TECHCARE_SMTP_USER
@@ -32,7 +34,13 @@ export async function sendMail(to, subject, text, demo) {
   });
   try {
     await transport.sendMail({ from: process.env.TECHCARE_SMTP_FROM, to, subject, text });
-  } catch {
+  } catch (error) {
+    // Operators need the reason (bad login, wrong port, unknown host); it never includes the password.
+    console.error(
+      'TechCare email delivery failed:',
+      error?.code || error?.name,
+      error?.response || '',
+    );
     throw new Problem('Email could not be delivered. Please try again later.', 503);
   } finally {
     transport.close();
