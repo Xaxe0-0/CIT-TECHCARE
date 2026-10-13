@@ -617,3 +617,16 @@ button.inbox-row:hover,
 .admin-user {
   flex-wrap: wrap;
 }
+/* My Dashboard spacing: separate stacked panels and give each row's parts their own line. */
+.profile-layout > div > * + * {
+  margin-top: 20px;
+}
+.account-settings {
+  margin-top: 24px;
+}
+.own-question small {
+  display: block;
+}
+.own-question .action-link {
+  margin-top: 10px;
+}
