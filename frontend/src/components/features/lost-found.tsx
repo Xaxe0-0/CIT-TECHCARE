@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Plus, MapPin } from '@phosphor-icons/react';
 import { useTechCare } from '@/context/techcare-context';
@@ -62,6 +62,7 @@ export function LostFoundPage() {
           ['lost', 'Lost'],
           ['found', 'Found'],
           ['returned', 'Returned'],
+          ['archived', 'Archived'],
         ].map(([key, label]) => (
           <button
             key={key}
@@ -135,13 +136,20 @@ function NoticeCard({ report: r }: { report: Notice }) {
       {returning && (
         <Form
           submit="Confirm item returned"
-          onSubmit={async () => {
-            const response = await api<Result>('lost-found/returned', { id: r.id });
+          onSubmit={async (values) => {
+            const response = await api<Result>('lost-found/returned', { ...values, id: r.id });
             notify(response.message!);
             refresh();
           }}
         >
-          <p>Confirm that this item has been returned to its owner.</p>
+          <TextArea
+            label="Return record (private)"
+            name="note"
+            min={5}
+            max={500}
+            placeholder="Who received the item, and how did they show it was theirs?"
+          />
+          <p className="form-hint">Only you and the project team can see this record.</p>
           <button type="button" className="text-button" onClick={() => setReturning(false)}>
             Cancel
           </button>
@@ -173,7 +181,14 @@ export function LostFoundEditor() {
   const { user, ready, auth, notify, refresh } = useTechCare();
   const router = useRouter();
   const [photos, setPhotos] = useState(1);
-  if (!ready) return <Loading />;
+  // ?edit=ID reopens the reporter's own pending or rejected notice for resubmission.
+  const editId = useSearchParams().get('edit');
+  const existing = useData<{
+    item: Notice & { status: string; review_note: string; photos: string[] };
+  }>(user && editId ? 'my-content?kind=report&id=' + encodeURIComponent(editId) : null);
+  const item = existing.data?.item;
+  if (!ready || existing.loading) return <Loading />;
+  if (existing.error) return <ErrorState message={existing.error} retry={existing.reload} />;
   if (!user)
     return (
       <section className="panel">
@@ -186,28 +201,50 @@ export function LostFoundEditor() {
   return (
     <EditorFrame
       back="/lostfound"
-      title="Report a lost or found item"
-      description="Add the details and a few clear photos. Your notice will appear after review, without your contact details."
+      title={item ? 'Edit your report' : 'Report a lost or found item'}
+      description={
+        item
+          ? 'Update the details and resubmit. Your notice is reviewed again before it appears.'
+          : 'Add the details and a few clear photos. Your notice will appear after review, without your contact details.'
+      }
     >
+      {item?.status === 'rejected' && item.review_note && (
+        <p className="review-note">
+          <strong>Moderator note:</strong> {item.review_note}
+        </p>
+      )}
       <Form
-        submit="Send for review"
+        key={item?.id ?? 'new'}
+        submit={item ? 'Resubmit for review' : 'Send for review'}
         onSubmit={async (values, progress) => {
-          const response = await api<Result>('lost-found', values, undefined, progress);
+          const response = await api<Result>(
+            'lost-found',
+            item ? { ...values, id: item.id } : values,
+            undefined,
+            progress,
+          );
           window.dispatchEvent(new Event('techcare-editor-saved'));
           notify(response.message!);
           refresh();
           router.push('/lostfound');
         }}
       >
-        <Select label="Report type" name="kind" options={['lost', 'found']} />
-        <Field label="Item name" name="item" min={3} max={100} />
+        <Select label="Report type" name="kind" options={['lost', 'found']} value={item?.kind} />
+        <Field label="Item name" name="item" min={3} max={100} value={item?.item} />
         <div className="editor-field-pair">
-          <Field label="Location last seen or found" name="location" min={3} max={100} />
+          <Field
+            label="Location last seen or found"
+            name="location"
+            min={3}
+            max={100}
+            value={item?.location}
+          />
           <Field
             label="Date lost or found (optional)"
             name="event_date"
             type="date"
             required={false}
+            value={item?.event_date}
           />
         </div>
         <TextArea
@@ -215,11 +252,18 @@ export function LostFoundEditor() {
           name="details"
           min={10}
           max={500}
+          value={item?.details}
           placeholder="Describe the item’s appearance and where it was last seen."
         />
         <section className="step-builder">
           <h2>Item photos</h2>
           <p>Up to four photos. Avoid showing IDs, contact details, or serial numbers.</p>
+          {!!item?.photos.length && (
+            <>
+              <PhotoGallery photos={item.photos} title={item.item} />
+              <p className="form-hint">Choosing new photos replaces these saved photos.</p>
+            </>
+          )}
           {Array.from({ length: photos }, (_, i) => (
             <Upload key={i} name={'photo' + i} label={'Photo ' + (i + 1) + ' (optional)'} />
           ))}

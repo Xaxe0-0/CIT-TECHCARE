@@ -421,14 +421,89 @@
 .notifications-panel h2 {
   font-size: 1.3rem;
 }
-.notifications-panel > a {
+.notifications-panel > :is(a, .notification-item) {
   display: block;
+  margin: 0;
   padding: 1rem 0.5rem;
   border-bottom: 1px solid var(--line);
   font-size: 0.9rem;
 }
-.notifications-panel > a.unread {
+.notifications-panel > :is(a, .notification-item).unread {
   background: var(--blue-light);
+}
+.badge.danger {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+.review-note {
+  margin: 0.6rem 0 0;
+  padding: 0.6rem 0.75rem;
+  border-left: 3px solid var(--danger);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--danger) 7%, transparent);
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+.own-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-top: 0.6rem;
+}
+.account-settings details {
+  border-top: 1px solid var(--line);
+  padding: 0.9rem 0;
+}
+.account-settings summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.account-settings details[open] summary {
+  margin-bottom: 0.8rem;
+}
+.feedback-summary {
+  display: grid;
+  gap: 1rem;
+  justify-items: start;
+}
+.feedback-summary strong {
+  display: block;
+  font-size: 1.8rem;
+}
+.feedback-summary ul {
+  display: grid;
+  gap: 0.35rem;
+  width: min(100%, 420px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.feedback-summary li {
+  display: grid;
+  grid-template-columns: 3rem 1fr 2.5rem;
+  align-items: center;
+  gap: 0.6rem;
+}
+.feedback-summary meter {
+  width: 100%;
+}
+.table-scroll {
+  overflow-x: auto;
+}
+.activity-log table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.activity-log :is(th, td) {
+  padding: 0.55rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+.activity-log td:last-child {
+  overflow-wrap: anywhere;
 }
 .inbox-panel h3 {
   margin: 1.1rem 0 0.3rem;
@@ -537,4 +612,8 @@ button.inbox-row:hover,
     top: 4.5rem;
     right: 1rem;
   }
+}
+/* Role and suspension controls wrap instead of overflowing the row. */
+.admin-user {
+  flex-wrap: wrap;
 }

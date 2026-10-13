@@ -100,7 +100,9 @@ type Notification = {
   root_id: number;
   page: number;
   title: string;
+  created: number;
 };
+type Alert = { id: number; text: string; link: string; seen: number; created: number };
 // Topbar panels close on navigation or Escape and refresh once a minute while the page is visible.
 function useTopbarPanel() {
   const pathname = usePathname();
@@ -297,14 +299,38 @@ export function Inbox() {
 export function ReplyNotifications() {
   const { version } = useTechCare();
   const { tick, open, setOpen } = useTopbarPanel();
-  const result = useData<{ notifications: Notification[] }>('notifications', version + tick);
-  const unread = result.data?.notifications.filter((n) => !n.seen).length || 0;
+  const result = useData<{ notifications: Notification[]; alerts: Alert[] }>(
+    'notifications',
+    version + tick,
+  );
+  // Comment replies and other alerts (decisions, friends, item messages) share one list.
+  const items = [
+    ...(result.data?.notifications || []).map((n) => ({
+      key: 'reply-' + n.id,
+      seen: n.seen,
+      created: n.created,
+      href: '/discussion/' + n.post_id + '?page=' + n.page + '&root=' + n.root_id + '#comments',
+      content: (
+        <>
+          <strong>{n.name}</strong> replied in <span>{n.title}</span>
+        </>
+      ),
+    })),
+    ...(result.data?.alerts || []).map((a) => ({
+      key: 'alert-' + a.id,
+      seen: a.seen,
+      created: a.created,
+      href: a.link,
+      content: <>{a.text}</>,
+    })),
+  ].sort((a, b) => b.created - a.created);
+  const unread = items.filter((n) => !n.seen).length;
   return (
     <>
       <div className="reply-notifications">
         <button
           className="icon-button"
-          aria-label={'Reply notifications' + (unread ? ', ' + unread + ' unread' : '')}
+          aria-label={'Notifications' + (unread ? ', ' + unread + ' unread' : '')}
           aria-expanded={open}
           aria-controls="reply-notifications-panel"
           onClick={() => setOpen(!open)}
@@ -319,16 +345,16 @@ export function ReplyNotifications() {
           <>
             <button
               className="notifications-scrim"
-              aria-label="Close reply notifications"
+              aria-label="Close notifications"
               onClick={() => setOpen(false)}
             />
             <section
               id="reply-notifications-panel"
               className="notifications-panel"
-              aria-label="Reply notifications"
+              aria-label="Notifications"
             >
               <div className="section-heading">
-                <h2>Replies to you</h2>
+                <h2>Notifications</h2>
                 <button className="text-button" onClick={() => setOpen(false)}>
                   Close
                 </button>
@@ -337,7 +363,7 @@ export function ReplyNotifications() {
                 <Loading />
               ) : result.error ? (
                 <ErrorState message={result.error} retry={result.reload} />
-              ) : result.data?.notifications.length ? (
+              ) : items.length ? (
                 <>
                   <Form
                     submit="Mark all as read"
@@ -346,29 +372,32 @@ export function ReplyNotifications() {
                       result.reload();
                     }}
                   >
-                    <span className="form-hint">New replies appear after approval.</span>
+                    <span className="form-hint">
+                      Replies, review decisions, friends, and item messages appear here.
+                    </span>
                   </Form>
-                  {result.data.notifications.map((n) => (
-                    <Link
-                      key={n.id}
-                      href={
-                        '/discussion/' +
-                        n.post_id +
-                        '?page=' +
-                        n.page +
-                        '&root=' +
-                        n.root_id +
-                        '#comments'
-                      }
-                      onClick={() => setOpen(false)}
-                      className={n.seen ? '' : 'unread'}
-                    >
-                      <strong>{n.name}</strong> replied in <span>{n.title}</span>
-                    </Link>
-                  ))}
+                  {items.map((n) =>
+                    n.href ? (
+                      <Link
+                        key={n.key}
+                        href={n.href}
+                        onClick={() => setOpen(false)}
+                        className={n.seen ? '' : 'unread'}
+                      >
+                        {n.content}
+                      </Link>
+                    ) : (
+                      <p key={n.key} className={'notification-item' + (n.seen ? '' : ' unread')}>
+                        {n.content}
+                      </p>
+                    ),
+                  )}
                 </>
               ) : (
-                <p>No replies yet. We’ll let you know when someone replies to your comment.</p>
+                <p>
+                  Nothing new. We’ll let you know about replies, review decisions, and friend
+                  activity.
+                </p>
               )}
             </section>
           </>,

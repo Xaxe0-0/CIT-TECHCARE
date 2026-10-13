@@ -46,6 +46,7 @@ import { LostFoundPage } from './lost-found';
 import { ContentReports } from './community-extras';
 import { GuideDetail, GuideIcon } from './home';
 import { Discussion, Members } from './community';
+import { AccountSettings, MyQuestion, MyReports } from './my-content';
 import { categories } from '@/utils/content';
 import type {
   Guide,
@@ -431,6 +432,7 @@ function Profile() {
             <TextArea label="About me" name="bio" max={400} value={user!.bio} required={false} />
             <Upload name="picture" label="Profile picture" />
           </Form>
+          <AccountSettings />
         </section>
         <div>
           {result.loading ? (
@@ -443,29 +445,7 @@ function Profile() {
                 <h2>My questions</h2>
                 {result.data?.posts.length ? (
                   result.data.posts.map((p) => (
-                    <div className="own-question" key={p.id}>
-                      <div>
-                        <h3>{p.title}</h3>
-                        <small>{date(p.created)}</small>
-                        {p.photo && (
-                          <a
-                            className="action-link"
-                            href={p.photo}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            <ImageIcon size={18} aria-hidden="true" /> View attached photo
-                          </a>
-                        )}
-                      </div>
-                      <Badge
-                        tone={
-                          p.status === 'published' ? 'green' : p.status === 'pending' ? 'gold' : ''
-                        }
-                      >
-                        {p.status}
-                      </Badge>
-                    </div>
+                    <MyQuestion key={p.id} post={p} changed={result.reload} />
                   ))
                 ) : (
                   <Empty title="No questions yet">
@@ -474,6 +454,7 @@ function Profile() {
                 )}
                 <Pagination page={page} hasMore={result.data?.hasMore || false} onPage={setPage} />
               </section>
+              <MyReports reports={result.data?.reports || []} changed={result.reload} />
               <div className="two-panels connections">
                 {(['following', 'followers'] as const).map((type) => (
                   <section className="panel" key={type}>
@@ -509,6 +490,7 @@ function Moderation() {
   const { version, refresh, notify } = useTechCare(),
     [tab, setTab] = useState('Questions'),
     [answer, setAnswer] = useState<Post | null>(null),
+    [rejecting, setRejecting] = useState<{ kind: string; id: number; title: string } | null>(null),
     [busy, setBusy] = useState('');
   const result = useData<Queue>('queue', version, 2500);
   useEffect(() => {
@@ -605,7 +587,7 @@ function Moderation() {
                       <button
                         disabled={!!busy}
                         className="button secondary danger"
-                        onClick={() => decide('post', p.id, 'rejected')}
+                        onClick={() => setRejecting({ kind: 'post', id: p.id, title: p.title })}
                       >
                         Reject
                       </button>
@@ -669,7 +651,7 @@ function Moderation() {
                       <button
                         disabled={!!busy}
                         className="button secondary danger"
-                        onClick={() => decide('report', r.id, 'rejected')}
+                        onClick={() => setRejecting({ kind: 'report', id: r.id, title: r.item })}
                       >
                         Reject
                       </button>
@@ -679,6 +661,31 @@ function Moderation() {
               ) : (
                 <Empty title="No reports awaiting review" />
               ))}
+            {tab === 'Feedback' && result.data.feedbackSummary.count > 0 && (
+              <section className="panel feedback-summary" aria-label="Feedback summary">
+                <div>
+                  <strong>{result.data.feedbackSummary.average.toFixed(1)} / 5</strong>
+                  <span>average from {result.data.feedbackSummary.count} responses</span>
+                </div>
+                <ul>
+                  {[5, 4, 3, 2, 1].map((n) => (
+                    <li key={n}>
+                      <span>{n} ★</span>
+                      <meter
+                        min={0}
+                        max={result.data!.feedbackSummary.count}
+                        value={result.data!.feedbackSummary.ratings[n]}
+                        aria-label={n + ' star responses'}
+                      />
+                      <span>{result.data!.feedbackSummary.ratings[n]}</span>
+                    </li>
+                  ))}
+                </ul>
+                <a className="button secondary small" href="/api/feedback.csv" download>
+                  Download all feedback (CSV)
+                </a>
+              </section>
+            )}
             {tab === 'Feedback' &&
               (result.data.feedback.length ? (
                 result.data.feedback.map((f) => (
@@ -718,6 +725,42 @@ function Moderation() {
             )}
           </>
         )
+      )}
+      {rejecting && (
+        <Modal
+          title={'Reject: ' + rejecting.title}
+          description="The author is notified and can edit and resubmit from their dashboard."
+          onClose={() => setRejecting(null)}
+        >
+          <Form
+            submit="Reject submission"
+            onSubmit={async (values) => {
+              const r = await api<Result>('moderate', {
+                ...values,
+                kind: rejecting.kind,
+                id: rejecting.id,
+                status: 'rejected',
+              });
+              setRejecting(null);
+              refresh();
+              notify(r.message!);
+            }}
+          >
+            <TextArea
+              label="Note to the author (optional)"
+              name="note"
+              max={500}
+              required={false}
+              placeholder="What should they change before resubmitting?"
+            />
+            <TextArea
+              label="Internal decision note (optional)"
+              name="reason"
+              max={500}
+              required={false}
+            />
+          </Form>
+        </Modal>
       )}
       {answer && (
         <Modal
@@ -774,8 +817,21 @@ function Admin() {
 
 function AdminAppSettings() {
   const { user, version, refresh, notify } = useTechCare(),
-    [busy, setBusy] = useState<number | null>(null);
+    [busy, setBusy] = useState<number | null>(null),
+    [suspending, setSuspending] = useState<User | null>(null);
   const [query, setQuery] = useState('');
+  async function restore(u: User) {
+    setBusy(u.id);
+    try {
+      const r = await api<Result>('admin/suspend', { id: u.id, suspended: false });
+      notify(r.message!);
+      refresh();
+    } catch (e) {
+      notify((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
   const [page, setPage] = useState(1);
   const result = useData<{ users: User[]; hasMore: boolean }>(
     `admin/users?q=${encodeURIComponent(query)}&page=${page}`,
@@ -828,34 +884,44 @@ function AdminAppSettings() {
                   <small>{u.email}</small>
                 </div>
                 <Badge>{u.role}</Badge>
+                {!!u.suspended && <Badge tone="danger">Suspended</Badge>}
                 {u.role === 'admin' ? (
                   <span className="muted">Protected</span>
                 ) : (
-                  <button
-                    disabled={busy !== null || !u.verified}
-                    className="button secondary small"
-                    onClick={async () => {
-                      setBusy(u.id);
-                      try {
-                        const r = await api<Result>('admin/role', {
-                          id: u.id,
-                          role: u.role === 'moderator' ? 'member' : 'moderator',
-                        });
-                        notify(r.message!);
-                        refresh();
-                      } catch (e) {
-                        notify((e as Error).message);
-                      } finally {
-                        setBusy(null);
-                      }
-                    }}
-                  >
-                    {!u.verified
-                      ? 'Awaiting verification'
-                      : u.role === 'moderator'
-                        ? 'Remove moderator'
-                        : 'Make moderator'}
-                  </button>
+                  <>
+                    <button
+                      disabled={busy !== null || !u.verified}
+                      className="button secondary small"
+                      onClick={async () => {
+                        setBusy(u.id);
+                        try {
+                          const r = await api<Result>('admin/role', {
+                            id: u.id,
+                            role: u.role === 'moderator' ? 'member' : 'moderator',
+                          });
+                          notify(r.message!);
+                          refresh();
+                        } catch (e) {
+                          notify((e as Error).message);
+                        } finally {
+                          setBusy(null);
+                        }
+                      }}
+                    >
+                      {!u.verified
+                        ? 'Awaiting verification'
+                        : u.role === 'moderator'
+                          ? 'Remove moderator'
+                          : 'Make moderator'}
+                    </button>
+                    <button
+                      disabled={busy !== null}
+                      className="button secondary small danger"
+                      onClick={() => (u.suspended ? restore(u) : setSuspending(u))}
+                    >
+                      {u.suspended ? 'Restore' : 'Suspend'}
+                    </button>
+                  </>
                 )}
               </div>
             ))}
@@ -863,6 +929,7 @@ function AdminAppSettings() {
         )}
         <Pagination page={page} hasMore={result.data?.hasMore || false} onPage={setPage} />
       </section>
+      <ActivityLog />
       <LogoSettings />
       <section className="panel hero-admin">
         <h2>Homepage illustration</h2>
@@ -879,6 +946,34 @@ function AdminAppSettings() {
           <Upload required label="New homepage illustration" />
         </Form>
       </section>
+      {suspending && (
+        <Modal
+          title={'Suspend ' + suspending.name + '?'}
+          description="They are signed out everywhere, cannot sign in, and are hidden from Members until restored."
+          onClose={() => setSuspending(null)}
+        >
+          <Form
+            submit="Suspend account"
+            onSubmit={async (values) => {
+              const r = await api<Result>('admin/suspend', {
+                ...values,
+                id: suspending.id,
+                suspended: true,
+              });
+              setSuspending(null);
+              notify(r.message!);
+              refresh();
+            }}
+          >
+            <TextArea
+              label="Reason (kept in the activity log)"
+              name="reason"
+              max={500}
+              required={false}
+            />
+          </Form>
+        </Modal>
+      )}
       <div className="callout">
         <ShieldCheck size={22} />
         <p>
@@ -887,5 +982,63 @@ function AdminAppSettings() {
         </p>
       </div>
     </>
+  );
+}
+
+function ActivityLog() {
+  const { version } = useTechCare();
+  const [page, setPage] = useState(1);
+  const result = useData<{
+    entries: {
+      id: number;
+      action: string;
+      kind: string;
+      target: number;
+      reason: string;
+      created: number;
+      name: string;
+    }[];
+    hasMore: boolean;
+  }>('admin/audit?page=' + page, version);
+  return (
+    <section className="panel activity-log">
+      <h2>Activity log</h2>
+      <p>Staff decisions and account changes, newest first.</p>
+      {result.loading ? (
+        <Loading />
+      ) : result.error ? (
+        <ErrorState message={result.error} retry={result.reload} />
+      ) : result.data?.entries.length ? (
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">When</th>
+                <th scope="col">Staff</th>
+                <th scope="col">Action</th>
+                <th scope="col">Target</th>
+                <th scope="col">Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              {result.data.entries.map((e) => (
+                <tr key={e.id}>
+                  <td>{date(e.created)}</td>
+                  <td>{e.name}</td>
+                  <td>{e.action}</td>
+                  <td>
+                    {e.kind} #{e.target}
+                  </td>
+                  <td>{e.reason}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="muted">No staff activity yet.</p>
+      )}
+      <Pagination page={page} hasMore={result.data?.hasMore || false} onPage={setPage} />
+    </section>
   );
 }

@@ -84,6 +84,12 @@ The root `package.json` owns the project commands, dependencies, and lockfile. R
 - Full-page admin editors with drafts, previews, upload progress, and guide-step images. Media accepts images, uploaded videos, and HTTPS website links, including YouTube and Vimeo.
 - Discussion comment images, replies to replies, author editing/deletion, reply notifications, and staff content-report review.
 - Staff resource publishing, protected administrator accounts, role assignment, and hero replacement.
+- A Friends & messages panel with incoming/sent friend requests and conversations with unread counts, plus show/hide toggles on password fields.
+- Authors edit and resubmit pending or rejected questions and Lost & Found reports, and delete their own. Moderators can add a note for the author when rejecting.
+- Notifications for replies, review decisions, accepted friend requests, and private item messages.
+- Account settings: change password (other devices signed out), change email through a code sent to the new address, and delete account (public posts remain as “Deleted member”).
+- Admin account suspension and restore, a staff activity log, and a feedback summary with CSV export.
+- Lost & Found return records (private to the reporter and staff) and automatic archiving of unreturned notices after 90 days.
 - Image decoding/re-encoding, bounded uploads, persistent abuse limits, same-origin mutation checks, security headers, and nonce-based HTML script CSP.
 
 ## Verification

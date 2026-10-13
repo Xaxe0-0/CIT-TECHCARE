@@ -325,7 +325,7 @@ export async function communityGet(path, url, me) {
   if (path === 'notifications') {
     requireUser(me);
     const rows = await all(
-      `SELECT n.id,n.seen,c.post_id,c.id AS comment_id,c.root_id,u.name,p.title,
+      `SELECT n.id,n.seen,n.created,c.post_id,c.id AS comment_id,c.root_id,u.name,p.title,
       (SELECT count(*) FROM comments earlier WHERE earlier.post_id=c.post_id AND earlier.root_id IS NULL AND earlier.status='published' AND (earlier.created<root.created OR (earlier.created=root.created AND earlier.id<root.id))) AS preceding FROM notifications n
       JOIN comments c ON c.id=n.comment_id JOIN users u ON u.id=c.user_id JOIN posts p ON p.id=c.post_id
       LEFT JOIN comments root ON root.id=c.root_id WHERE n.user_id=? AND c.status='published' AND c.deleted=0
