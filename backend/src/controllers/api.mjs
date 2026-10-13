@@ -51,6 +51,7 @@ import { announcements, changeAnnouncement } from '../services/announcements.mjs
 import { voteColumns, changeVote } from '../services/discussion.mjs';
 import { managedContent, changeManagedContent } from '../services/managed-content.mjs';
 import { isRealtimeAvailable, publishRealtime } from '../services/realtime.mjs';
+import { assistantEnabled, streamAnswer } from '../services/assistant.mjs';
 
 const json = (payload, status = 200, headers = {}) =>
   Response.json(payload, { status, headers: { 'Cache-Control': 'no-store', ...headers } });
@@ -156,7 +157,8 @@ export async function handle(request) {
       );
     const d = await body(request, limit);
     const response = await post(path, d, me, request);
-    if (response.ok) {
+    // Assistant chats change nothing shared, so other tabs need no refresh.
+    if (response.ok && path !== 'assistant') {
       const type = [
         'login',
         'logout',
@@ -218,6 +220,7 @@ async function get(path, url, me, request) {
         '/static/techcare-hero.webp',
       classroom: demoMode(request),
       videoUploads: Boolean(process.env.TECHCARE_FFPROBE),
+      assistantAI: assistantEnabled(),
       logo: (await one("SELECT value FROM settings WHERE key='logo'"))?.value || '',
       realtime: isRealtimeAvailable(),
     });
@@ -509,6 +512,17 @@ async function post(path, d, me, request) {
       process.env.TECHCARE_SECURE_COOKIES === '1' || new URL(request.url).protocol === 'https:';
     return json({ accepted: true }, 200, {
       'Set-Cookie': `${CONSENT_COOKIE}=${CONSENT_VERSION}; Path=/; HttpOnly; SameSite=Lax${secure ? '; Secure' : ''}`,
+    });
+  }
+  if (path === 'assistant') {
+    const answer = await streamAnswer(d, me, request.signal);
+    return new Response(answer.stream, {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff',
+        'X-TechCare-Answer': answer.source,
+      },
     });
   }
   if (['admin/guides', 'admin/resources', 'admin/booths'].includes(path))

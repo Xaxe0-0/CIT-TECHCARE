@@ -35,7 +35,7 @@ export const helpTopics: HelpTopic[] = [
       /what can you|who are you|are you human|how do you work/,
     ],
     answer:
-      'I’m TechCare’s built-in help assistant. I can explain how this website works and share troubleshooting guides. My replies come from the project’s help content, without a ChatGPT account or paid AI service. I cannot view your account, perform actions for you, or answer every general-knowledge question.',
+      'I’m TechCare’s help assistant. I explain how this website works and share troubleshooting guides from the project’s help content. When the site runs a local AI model, I also answer common tech problems, using verified fixes where they match. There is no ChatGPT account or paid AI service. I cannot view your account, perform actions for you, or answer general-knowledge questions; for those, ask the community.',
     steps: [
       'Ask about accounts, discussions, friends, messages, privacy, resources, or the support booth.',
       'After an answer, ask “Show me the steps” for more detail.',
@@ -47,13 +47,14 @@ export const helpTopics: HelpTopic[] = [
     question: 'How do I delete my account?',
     matches: [/\b(delete|remove|erase|close)\b.*\b(account|data)\b/],
     answer:
-      'This pilot does not have a self-service account deletion feature. The team operating TechCare needs to handle deletion requests and define its retention policy. I cannot delete your account or stored data.',
+      'You can delete your account yourself from My Dashboard. Your name, email, profile, connections, and private messages are removed; your public questions and comments stay, credited to “Deleted member”. I cannot delete your account for you.',
     steps: [
-      'Use Feedback to raise the request with the operating team without including passwords.',
-      'Read the pilot privacy notice for the current limitations.',
-      'Clear chat only erases this assistant’s local conversation; it does not delete your TechCare account.',
+      'Sign in and open My Dashboard.',
+      'Under Account settings, open Delete account and enter your current password.',
+      'Choose Permanently delete my account. This cannot be undone.',
+      'Administrator accounts are protected and are removed by the operating team instead.',
     ],
-    link: { href: '/privacy', label: 'Read the pilot privacy notice' },
+    link: { href: '/profile', label: 'Open My Dashboard' },
   },
   {
     id: 'recovery',
@@ -69,6 +70,7 @@ export const helpTopics: HelpTopic[] = [
       'Enter your account email and choose Send recovery instructions.',
       'Choose Reset password with a token, enter the recovery token and a new password of 12–128 characters.',
       'Sign in again. A successful reset ends your existing sessions. Never send the token to this chat.',
+      'Signed in already? Change your password in My Dashboard under Account settings.',
     ],
   },
   {

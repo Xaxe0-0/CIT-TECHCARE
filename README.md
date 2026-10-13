@@ -8,9 +8,12 @@ The project includes the updated blue design, larger text, campus day/night back
 
 Requires Node.js 24 or later and a running MySQL-compatible database. The project uses Next.js 16, React 19, TypeScript, MySQL through `mysql2/promise`, Radix Dialog, Phosphor icons, Sharp, and Nodemailer.
 
+On Windows, double-click `setup.bat` (macOS/Linux: `./setup.sh`): choose **2** once to set up everything, including the database and the local AI assistant, then **1** (the default) to start. Or run the steps yourself:
+
 ```powershell
 npm ci
 npm run setup
+npm run setup:database
 npm run dev
 ```
 
@@ -72,7 +75,7 @@ The root `package.json` owns the project commands, dependencies, and lockfile. R
 - Saved light/dark appearance through the sun/moon button in the top bar, including forms, dialogs, navigation, and the help assistant.
 - Admin → App logo supports PNG/JPEG/WebP uploads up to 3 MB, previews, saving, and restoring the original TechCare logo. The navigation and browser favicon follow the saved logo; uploaded images are validated and resized without stretching.
 - Inline form validation for required fields, email addresses, HTTPS links, length limits, verification codes, and file types/sizes, with keyboard focus on the first invalid field. Server validation remains enforced.
-- A bottom-right help chatbot covering app features, accounts, friends, messaging, privacy, moderation, and device guides, with basic follow-up steps and community/support links. Uses editable built-in content, with no personal ChatGPT account, AI API, or AI usage fees. Chat is temporary and is cleared on refresh or account changes.
+- A bottom-right help chatbot covering app features, accounts, friends, messaging, privacy, moderation, and device guides, with basic follow-up steps and community/support links. Questions the built-in help cannot answer go to a local [Ollama](https://ollama.com) model on the server: common problems get a verified fix word for word, other tech questions get a streamed AI answer that is labelled as such, and anything off-topic or uncertain is pointed to Discussion. No ChatGPT account, cloud AI API, or usage fees; if Ollama is not running, built-in help still works. Chat is temporary and is cleared on refresh or account changes.
 - Separate account creation, verification, sign-in, verification recovery, password recovery, and reset dialogs.
 - Persistent JWT sessions use HttpOnly cookies, and refreshing restores the current route and signed-in account. In production, a same-instance WebSocket sends data-free invalidation events so active pages reload fresh results through authenticated API requests.
 - Persistent accounts, hashed passwords, revocable JWT sessions, server-side roles, dashboard, profile editing, and private avatars.

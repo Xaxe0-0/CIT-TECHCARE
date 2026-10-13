@@ -184,3 +184,18 @@
     margin: 8px 16px;
   }
 }
+
+/* Local AI answers: keep the model's line breaks and show where each answer came from. */
+.assistant-answer {
+  white-space: pre-line;
+}
+.assistant-answer-source {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.assistant-thinking {
+  color: var(--muted);
+  font-style: italic;
+}

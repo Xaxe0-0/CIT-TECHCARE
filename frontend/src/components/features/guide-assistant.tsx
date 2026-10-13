@@ -17,6 +17,12 @@ import type { Guide } from '@shared/types';
 import { helpSuggestions } from '@/utils/assistant-knowledge';
 
 type Message = { id: number; role: 'user' | 'assistant'; reply: GuideReply };
+// Small models sometimes add markdown despite instructions; show plain text.
+const tidy = (text: string) =>
+  text
+    .replace(/\*\*|__|`/g, '')
+    .replace(/^#+\s*/gm, '')
+    .trim();
 const welcome: Message = {
   id: 0,
   role: 'assistant',
@@ -31,6 +37,11 @@ export function GuideAssistant({ onAsk }: { onAsk: () => void }) {
   const [activated, setActivated] = useState(false);
   const library = useData<{ guides: Guide[] }>(activated ? 'guides' : null, version);
   const guides = library.data?.guides || [];
+  const settings = useData<{ assistantAI: boolean }>(activated ? 'settings' : null);
+  const aiEnabled = !!settings.data?.assistantAI;
+  const streaming = useRef<AbortController | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => () => streaming.current?.abort(), []);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState('');
   const [messages, setMessages] = useState<Message[]>([welcome]);
@@ -50,20 +61,74 @@ export function GuideAssistant({ onAsk }: { onAsk: () => void }) {
   }, [messages, open]);
 
   function close() {
+    streaming.current?.abort();
     setOpen(false);
     requestAnimationFrame(() => launcher.current?.focus());
   }
+  const update = (id: number, reply: GuideReply) =>
+    setMessages((previous) => previous.map((m) => (m.id === id ? { ...m, reply } : m)));
+  // Questions the built-in help cannot answer go to the server's local AI, streamed token by token.
+  async function askAI(id: number, text: string, builtIn: GuideReply) {
+    const controller = new AbortController();
+    streaming.current = controller;
+    setBusy(true);
+    try {
+      const response = await fetch('/api/assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-TechCare-Request': '1' },
+        body: JSON.stringify({ message: text }),
+        signal: controller.signal,
+      });
+      if (!response.ok || !response.body) throw new Error('unavailable');
+      const source =
+        response.headers.get('X-TechCare-Answer') === 'verified' ? 'verified' : 'generated';
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let answer = '';
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        answer += decoder.decode(value, { stream: true });
+        // Hold back a reply that may be the decline word until it is clearly an answer.
+        if (!'ESCALATE'.startsWith(answer.trim().toUpperCase()))
+          update(id, { text: tidy(answer), source, pending: true });
+      }
+      update(
+        id,
+        /ESCALATE/.test(answer) || !answer.trim()
+          ? {
+              text: 'I can’t answer that one reliably. You can ask here in Discussion: describe your device and what you already tried, and the community can help.',
+              link: { href: '/discussion', label: 'Ask in Discussion' },
+            }
+          : {
+              text: tidy(answer),
+              source,
+              link: { href: '/discussion', label: 'Still stuck? Ask in Discussion' },
+            },
+      );
+    } catch {
+      if (!controller.signal.aborted) update(id, builtIn);
+    } finally {
+      if (streaming.current === controller) {
+        streaming.current = null;
+        setBusy(false);
+      }
+    }
+  }
   function send(value: string, contextTopic?: string) {
     const text = value.trim().slice(0, 400);
-    if (!text) return;
+    if (!text || busy) return;
     const question: Message = { id: ++sequence.current, role: 'user', reply: { text } };
+    const builtIn = getGuideReply(text, contextTopic ?? topic.current, guides);
+    const ai = builtIn.fallback && aiEnabled;
     const answer: Message = {
       id: ++sequence.current,
       role: 'assistant',
-      reply: getGuideReply(text, contextTopic ?? topic.current, guides),
+      reply: ai ? { text: '', pending: true } : builtIn,
     };
     topic.current = answer.reply.topic;
     setMessages((previous) => [...previous, question, answer].slice(-41));
+    if (ai) void askAI(answer.id, text, builtIn);
     setDraft('');
     input.current?.focus();
   }
@@ -103,7 +168,10 @@ export function GuideAssistant({ onAsk }: { onAsk: () => void }) {
             </button>
           </div>
           <div className="assistant-source">
-            <BookOpen size={15} /> Built-in TechCare help · No AI service
+            <BookOpen size={15} />{' '}
+            {aiEnabled
+              ? 'TechCare help · Local AI on this server · No paid AI service'
+              : 'Built-in TechCare help · No AI service'}
           </div>
           <div
             ref={log}
@@ -124,7 +192,20 @@ export function GuideAssistant({ onAsk }: { onAsk: () => void }) {
                 ) : (
                   <span className="assistant-speaker">{role === 'user' ? 'You' : 'TechCare'}</span>
                 )}
-                <p>{reply.text}</p>
+                {reply.pending && !reply.text ? (
+                  <p className="assistant-thinking" role="status">
+                    Thinking…
+                  </p>
+                ) : (
+                  <p className={reply.source ? 'assistant-answer' : undefined}>{reply.text}</p>
+                )}
+                {reply.source && !reply.pending && (
+                  <small className="assistant-answer-source">
+                    {reply.source === 'verified'
+                      ? 'Verified TechCare fix'
+                      : 'AI-generated answer. Check that the steps match your device.'}
+                  </small>
+                )}
                 {reply.steps && (
                   <ol>
                     {reply.steps.map((step) => (
@@ -191,11 +272,13 @@ export function GuideAssistant({ onAsk }: { onAsk: () => void }) {
               id="assistant-question"
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
-              placeholder="Ask about TechCare…"
+              placeholder={
+                aiEnabled ? 'Ask about TechCare or a tech problem…' : 'Ask about TechCare…'
+              }
               maxLength={400}
               autoComplete="off"
             />
-            <button type="submit" disabled={!draft.trim()} aria-label="Send question">
+            <button type="submit" disabled={!draft.trim() || busy} aria-label="Send question">
               <ArrowUp size={21} weight="bold" />
             </button>
           </form>
@@ -216,6 +299,7 @@ export function GuideAssistant({ onAsk }: { onAsk: () => void }) {
             <button
               type="button"
               onClick={() => {
+                streaming.current?.abort();
                 setMessages([welcome]);
                 topic.current = undefined;
                 setDraft('');
