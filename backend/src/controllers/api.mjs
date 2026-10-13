@@ -2,10 +2,22 @@ import {
   listComments,
   saveComment,
   saveLost,
+  deleteLost,
+  savePost,
+  deletePost,
   communityGet,
   communityPost,
   notifyReply,
+  alert,
+  LOST_FOUND_DAYS,
 } from '../services/community-content.mjs';
+import {
+  changePassword,
+  requestEmailChange,
+  confirmEmailChange,
+  deleteAccount,
+} from '../services/account.mjs';
+import { setSuspended, auditLog, feedbackSummary, feedbackCsv } from '../services/admin-tools.mjs';
 import { randomInt } from 'node:crypto';
 import { CONSENT_COOKIE, CONSENT_VERSION, hasConsent } from '../../../shared/src/consent.mjs';
 import { all, one, run, now, transaction } from '../config/db.mjs';
@@ -27,15 +39,11 @@ import {
   issueJWT,
   demoMode,
   assertConfig,
+  sessionToken,
 } from '../middleware/auth.mjs';
 import * as v from '../validations/validation.mjs';
 import { sendMail } from '../services/mail.mjs';
-import {
-  readMedia,
-  saveMedia,
-  discardQuestionMedia,
-  discardProfileMedia,
-} from '../services/media.mjs';
+import { readMedia, saveMedia, discardProfileMedia } from '../services/media.mjs';
 import sharp from 'sharp';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -149,7 +157,17 @@ export async function handle(request) {
     const d = await body(request, limit);
     const response = await post(path, d, me, request);
     if (response.ok) {
-      const type = ['login', 'logout', 'reset-password', 'profile', 'admin/role'].includes(path)
+      const type = [
+        'login',
+        'logout',
+        'reset-password',
+        'profile',
+        'admin/role',
+        'admin/suspend',
+        'account/password',
+        'account/email/verify',
+        'account/delete',
+      ].includes(path)
         ? 'session'
         : ['admin/logo', 'admin/hero'].includes(path)
           ? 'settings'
@@ -179,7 +197,7 @@ export async function handle(request) {
 }
 
 async function get(path, url, me, request) {
-  if (['notifications', 'content-reports', 'item-inquiries'].includes(path))
+  if (['notifications', 'content-reports', 'item-inquiries', 'my-content'].includes(path))
     return json(await communityGet(path, url, me));
   if (['guides', 'booths'].includes(path)) return json({ [path]: await managedContent(path) });
   if (['admin/guides', 'admin/resources', 'admin/booths'].includes(path)) {
@@ -266,11 +284,15 @@ async function get(path, url, me, request) {
     return json({
       ...paginated(
         await all(
-          `SELECT id,title,status,category,created,photo FROM posts WHERE user_id=? ORDER BY created DESC,id DESC LIMIT 21 OFFSET ${page.offset}`,
+          `SELECT id,title,status,category,created,photo,review_note FROM posts WHERE user_id=? ORDER BY created DESC,id DESC LIMIT 21 OFFSET ${page.offset}`,
           me.id,
         ),
         'posts',
         page,
+      ),
+      reports: await all(
+        'SELECT id,kind,item,status,review_note,returned,claim_note,created FROM lost_found WHERE user_id=? ORDER BY created DESC,id DESC LIMIT 50',
+        me.id,
       ),
       following,
       followers,
@@ -281,7 +303,7 @@ async function get(path, url, me, request) {
     const members = await Promise.all(
       (
         await all(
-          `SELECT * FROM users WHERE verified=1 AND name LIKE ? ORDER BY name,id LIMIT 21 OFFSET ${page.offset}`,
+          `SELECT * FROM users WHERE verified=1 AND suspended=0 AND name LIKE ? ORDER BY name,id LIMIT 21 OFFSET ${page.offset}`,
           `%${q}%`,
         )
       ).map((u) => member(u, me)),
@@ -403,13 +425,24 @@ async function get(path, url, me, request) {
     );
   if (path === 'lost-found') {
     const filter = url.searchParams.get('kind') || '';
-    if (filter) v.choice(filter, ['lost', 'found', 'returned'], 'notice filter');
+    if (filter) v.choice(filter, ['lost', 'found', 'returned', 'archived'], 'notice filter');
+    // Unreturned notices past their active window are listed only under Archived.
+    const cutoff = now() - LOST_FOUND_DAYS * 86400;
     const rows = await all(
-      `SELECT id,kind,item,details,location,created,photos,event_date,returned,user_id=? AS own FROM lost_found WHERE status='published' AND (?='' OR (?='returned' AND returned=1) OR (kind=? AND returned=0)) ORDER BY created DESC,id DESC LIMIT 21 OFFSET ${page.offset}`,
+      `SELECT id,kind,item,details,location,created,photos,event_date,returned,user_id=? AS own FROM lost_found WHERE status='published' AND (
+        (?='' AND (returned=1 OR created>?))
+        OR (?='returned' AND returned=1)
+        OR (?='archived' AND returned=0 AND created<=?)
+        OR (kind=? AND returned=0 AND created>?)
+      ) ORDER BY created DESC,id DESC LIMIT 21 OFFSET ${page.offset}`,
       me?.id || 0,
       filter,
+      cutoff,
       filter,
       filter,
+      cutoff,
+      filter,
+      cutoff,
     );
     return json(
       paginated(
@@ -434,6 +467,7 @@ async function get(path, url, me, request) {
       feedback: await all(
         'SELECT f.*,u.name FROM feedback f JOIN users u ON u.id=f.user_id ORDER BY f.created DESC LIMIT 100',
       ),
+      feedbackSummary: await feedbackSummary(),
       messageReports: await all(
         'SELECT r.id,r.reason,r.created,r.reporter,m.body,m.sender,m.receiver,u.name FROM message_reports r JOIN messages m ON m.id=r.message_id JOIN users u ON u.id=r.reporter ORDER BY r.created DESC LIMIT 100',
       ),
@@ -445,15 +479,25 @@ async function get(path, url, me, request) {
     const pattern = '%' + query.replace(/[!%_]/g, (character) => '!' + character) + '%';
     const rows = query
       ? await all(
-          `SELECT id,name,email,role,verified FROM users WHERE name LIKE ? ESCAPE '!' OR email LIKE ? ESCAPE '!' ORDER BY name COLLATE NOCASE,id LIMIT 21 OFFSET ${page.offset}`,
+          `SELECT id,name,email,role,verified,suspended FROM users WHERE name LIKE ? ESCAPE '!' OR email LIKE ? ESCAPE '!' ORDER BY name COLLATE NOCASE,id LIMIT 21 OFFSET ${page.offset}`,
           pattern,
           pattern,
         )
       : await all(
-          `SELECT id,name,email,role,verified FROM users WHERE role IN ('admin','moderator') ORDER BY role,name COLLATE NOCASE,id LIMIT 21 OFFSET ${page.offset}`,
+          `SELECT id,name,email,role,verified,suspended FROM users WHERE role IN ('admin','moderator') ORDER BY role,name COLLATE NOCASE,id LIMIT 21 OFFSET ${page.offset}`,
         );
     return json(paginated(rows, 'users', page));
   }
+  if (path === 'admin/audit') return json(await auditLog(url, me));
+  if (path === 'feedback.csv')
+    return new Response(await feedbackCsv(me), {
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="techcare-feedback.csv"',
+        'Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff',
+      },
+    });
   throw new Problem('Endpoint not found.', 404);
 }
 
@@ -595,13 +639,15 @@ async function post(path, d, me, request) {
     )
       throw new Problem('Invalid email or password.', 401);
     if (!u.verified) throw new Problem('Verify your email before signing in.', 403);
+    if (u.suspended)
+      throw new Problem('This account is suspended. Contact the project team for help.', 403);
     const token = issueJWT(u.id, time);
     await run('DELETE FROM sessions WHERE expires<=?', time);
     await run('INSERT INTO sessions VALUES(?,?,?)', digest(token), u.id, time + 604800);
     return json({ user: ownUser(u) }, 200, { 'Set-Cookie': cookie(token) });
   }
   if (path === 'logout') {
-    const token = request.headers.get('cookie')?.match(/(?:^|;\s*)techcare=([^;]+)/)?.[1];
+    const token = sessionToken(request);
     if (token) await run('DELETE FROM sessions WHERE token_hash=?', digest(token));
     return json({ ok: true }, 200, { 'Set-Cookie': cookie('', true) });
   }
@@ -700,13 +746,17 @@ async function post(path, d, me, request) {
           target,
           time,
         );
-      else if (action === 'accept' && state === 'incoming')
+      else if (action === 'accept' && state === 'incoming') {
         await run(
           "UPDATE friendships SET status='accepted' WHERE sender=? AND receiver=? AND status='pending'",
           target,
           me.id,
         );
-      else if (action === 'remove' && state !== 'none')
+        await alert(
+          target,
+          `${me.name} accepted your friend request. You can now message each other.`,
+        );
+      } else if (action === 'remove' && state !== 'none')
         await run(
           'DELETE FROM friendships WHERE (sender=? AND receiver=?) OR (sender=? AND receiver=?)',
           me.id,
@@ -782,35 +832,15 @@ async function post(path, d, me, request) {
       201,
     );
   }
-  if (path === 'posts') {
-    const title = v.text(d.title, 'Question title', 8, 120),
-      body = v.text(d.body, 'Problem description', 20, 2000),
-      category = v.choice(d.category, v.categories, 'category');
-    const photo = d.photo ? await saveMedia(d.photo, me.id, 'question') : '';
-    let r;
-    try {
-      r = await run(
-        'INSERT INTO posts(user_id,title,body,category,created,photo) VALUES(?,?,?,?,?,?)',
-        me.id,
-        title,
-        body,
-        category,
-        time,
-        photo,
-      );
-    } catch (error) {
-      if (photo) await discardQuestionMedia(photo, me.id);
-      throw error;
-    }
-    return json(
-      {
-        ok: true,
-        id: Number(r.lastInsertRowid),
-        message: 'Question submitted for moderator review. Track its status in My Dashboard.',
-      },
-      201,
-    );
-  }
+  if (path === 'posts') return json(await savePost(d, me), 201);
+  if (path === 'posts/delete') return json(await deletePost(d, me));
+  if (path === 'lost-found/delete') return json(await deleteLost(d, me));
+  if (path === 'account/password') return json(await changePassword(d, me, request));
+  if (path === 'account/email') return json(await requestEmailChange(d, me, demo));
+  if (path === 'account/email/verify') return json(await confirmEmailChange(d, me));
+  if (path === 'account/delete')
+    return json(await deleteAccount(d, me), 200, { 'Set-Cookie': cookie('', true) });
+  if (path === 'admin/suspend') return json(await setSuspended(d, me));
   if (path === 'comments') return json(await saveComment(d, me), 201);
   if (path === 'feedback') {
     const rating = v.id(d.rating);
@@ -846,7 +876,9 @@ async function post(path, d, me, request) {
       target = v.id(d.id),
       status = v.choice(d.status, ['published', 'rejected'], 'decision');
     const answer = d.answer ? v.text(d.answer, 'Answer', 3, 1000) : '',
-      reason = v.text(d.reason || '', 'Internal reason', 0, 500);
+      reason = v.text(d.reason || '', 'Internal reason', 0, 500),
+      // Shown to the author with a rejection; the internal reason stays in the audit log.
+      note = status === 'rejected' ? v.text(d.note || '', 'Note to the author', 0, 500) : '';
     if (answer && (kind !== 'post' || status !== 'published'))
       throw new Problem('An answer requires approving a question.');
     await transaction(async () => {
@@ -858,9 +890,17 @@ async function post(path, d, me, request) {
         ))
       )
         throw new Problem('The parent discussion is unavailable.', 409);
+      const submission =
+        kind === 'comment'
+          ? null
+          : await one(
+              `SELECT user_id,${kind === 'post' ? 'title' : 'item'} AS label FROM ${table} WHERE id=?`,
+              target,
+            );
       const r = await run(
-        `UPDATE ${table} SET status=? WHERE id=? AND status='pending'`,
+        `UPDATE ${table} SET status=?${submission ? ',review_note=?' : ''} WHERE id=? AND status='pending'`,
         status,
+        ...(submission ? [note] : []),
         target,
       );
       if (r.changes !== 1)
@@ -877,6 +917,23 @@ async function post(path, d, me, request) {
           time,
         );
       if (kind === 'comment' && status === 'published') await notifyReply(target);
+      if (submission && submission.user_id !== me.id) {
+        const subject =
+          kind === 'post'
+            ? `Your question “${submission.label}”`
+            : `Your Lost & Found notice “${submission.label}”`;
+        await alert(
+          submission.user_id,
+          status === 'published'
+            ? `${subject} was approved${answer ? ' and answered' : ''}.`
+            : `${subject} was not approved.${note ? ` Note from the moderator: ${note}` : ''} You can edit and resubmit it from My Dashboard.`,
+          status === 'rejected'
+            ? '/profile'
+            : kind === 'post'
+              ? `/discussion/${target}`
+              : '/lostfound',
+        );
+      }
       await audit(me, answer ? 'approve-and-answer' : status, kind, target, reason);
     });
     return json({

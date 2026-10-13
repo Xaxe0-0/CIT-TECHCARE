@@ -89,11 +89,13 @@ export function passwordOK(password, encoded) {
     return false;
   }
 }
+export const sessionToken = (request) =>
+  request.headers.get('cookie')?.match(/(?:^|;\s*)techcare=([^;]+)/)?.[1];
 export async function currentUser(request) {
-  const token = request.headers.get('cookie')?.match(/(?:^|;\s*)techcare=([^;]+)/)?.[1];
+  const token = sessionToken(request);
   if (!token || !verifyJWT(token)) return null;
   return await one(
-    'SELECT u.* FROM users u JOIN sessions s ON u.id=s.user_id WHERE s.token_hash=? AND s.expires>?',
+    'SELECT u.* FROM users u JOIN sessions s ON u.id=s.user_id WHERE s.token_hash=? AND s.expires>? AND u.suspended=0',
     digest(token),
     now(),
   );

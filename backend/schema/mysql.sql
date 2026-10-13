@@ -1,4 +1,4 @@
--- TechCare MySQL 8.0.16+ schema (latest application schema, migration version 8).
+-- TechCare MySQL 8.0.16+ schema (latest application schema, migration version 9).
 -- Select the application database before applying this file.
 SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS users (
   created BIGINT NOT NULL,
   visibility VARCHAR(16) NOT NULL DEFAULT 'public',
   verified TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  suspended TINYINT UNSIGNED NOT NULL DEFAULT 0,
   PRIMARY KEY (id),
   UNIQUE KEY users_email (email),
   CONSTRAINT users_role_check CHECK (role IN ('member','moderator','admin')),
@@ -56,6 +57,7 @@ CREATE TABLE IF NOT EXISTS posts (
   status VARCHAR(16) NOT NULL DEFAULT 'pending',
   created BIGINT NOT NULL,
   photo VARCHAR(512) NOT NULL DEFAULT '',
+  review_note VARCHAR(500) NOT NULL DEFAULT '',
   PRIMARY KEY (id),
   KEY post_status_time (status,created DESC,id DESC),
   KEY posts_user_created (user_id,created DESC,id DESC),
@@ -126,6 +128,9 @@ CREATE TABLE IF NOT EXISTS lost_found (
   photos LONGTEXT NOT NULL,
   event_date CHAR(10) NOT NULL DEFAULT '',
   returned TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  review_note VARCHAR(500) NOT NULL DEFAULT '',
+  claim_note VARCHAR(500) NOT NULL DEFAULT '',
+  returned_at BIGINT NOT NULL DEFAULT 0,
   PRIMARY KEY (id),
   CONSTRAINT lost_found_user_fk FOREIGN KEY (user_id) REFERENCES users(id),
   CONSTRAINT lost_found_kind_check CHECK (kind IN ('lost','found')),
@@ -352,6 +357,28 @@ CREATE TABLE IF NOT EXISTS item_inquiries (
   CONSTRAINT item_inquiries_user_fk FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS alerts (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id INT UNSIGNED NOT NULL,
+  text VARCHAR(700) NOT NULL,
+  link VARCHAR(512) NOT NULL DEFAULT '',
+  seen TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  created BIGINT NOT NULL,
+  PRIMARY KEY (id),
+  KEY alerts_user (user_id,id),
+  CONSTRAINT alerts_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS email_changes (
+  user_id INT UNSIGNED NOT NULL,
+  email VARCHAR(254) NOT NULL,
+  code_hash VARCHAR(160) NOT NULL,
+  expires BIGINT NOT NULL,
+  attempts INT UNSIGNED NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id),
+  CONSTRAINT email_changes_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 INSERT IGNORE INTO migrations (version,applied)
 VALUES (1,UNIX_TIMESTAMP()),(2,UNIX_TIMESTAMP()),(3,UNIX_TIMESTAMP()),
-       (4,UNIX_TIMESTAMP()),(5,UNIX_TIMESTAMP()),(6,UNIX_TIMESTAMP()),(7,UNIX_TIMESTAMP()),(8,UNIX_TIMESTAMP());
+       (4,UNIX_TIMESTAMP()),(5,UNIX_TIMESTAMP()),(6,UNIX_TIMESTAMP()),(7,UNIX_TIMESTAMP()),(8,UNIX_TIMESTAMP()),(9,UNIX_TIMESTAMP());

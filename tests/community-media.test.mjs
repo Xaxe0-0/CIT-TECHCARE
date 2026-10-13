@@ -324,10 +324,32 @@ try {
       (await call('item-inquiries', null, sessions.other)).data.inquiries[0].response,
       /project team/,
     );
-    assert.equal((await call('lost-found/returned', { id: lost }, sessions.other)).status, 403);
-    assert.equal((await call('lost-found/returned', { id: lost }, sessions.member)).status, 200);
+    const record = { id: lost, note: 'Returned to the owner after they described the case.' };
+    assert.equal((await call('lost-found/returned', record, sessions.other)).status, 403);
+    assert.equal(
+      (await call('lost-found/returned', { id: lost }, sessions.member)).status,
+      400,
+      'a return record is required',
+    );
+    assert.equal((await call('lost-found/returned', record, sessions.member)).status, 200);
+    assert.equal(one('SELECT claim_note FROM lost_found WHERE id=?', lost).claim_note, record.note);
     assert.equal((await call('lost-found?kind=lost')).data.reports.length, 0);
     assert.equal((await call('lost-found?kind=returned')).data.reports[0].id, lost);
+    assert.ok(!('claim_note' in (await call('lost-found?kind=returned')).data.reports[0]));
+    // Unreturned notices older than 90 days leave the active lists for Archived.
+    const old = Number(
+      run(
+        "INSERT INTO lost_found(user_id,kind,item,details,location,status,created,photos) VALUES(?,'found','Old umbrella','A plain black umbrella.','Library','published',?,'[]')",
+        ids.member,
+        now() - 91 * 86400,
+      ).lastInsertRowid,
+    );
+    assert.ok(!(await call('lost-found')).data.reports.some((r) => r.id === old));
+    assert.ok(!(await call('lost-found?kind=found')).data.reports.some((r) => r.id === old));
+    assert.deepEqual(
+      (await call('lost-found?kind=archived')).data.reports.map((r) => r.id),
+      [old],
+    );
   });
   await test('content reports are staff-only and removal revokes public access', async () => {
     assert.equal(
