@@ -42,7 +42,7 @@ import {
   sessionToken,
 } from '../middleware/auth.mjs';
 import * as v from '../validations/validation.mjs';
-import { sendMail } from '../services/mail.mjs';
+import { sendMail, codeEmail } from '../services/mail.mjs';
 import { readMedia, saveMedia, discardProfileMedia } from '../services/media.mjs';
 import sharp from 'sharp';
 import { readFile } from 'node:fs/promises';
@@ -561,8 +561,14 @@ async function post(path, d, me, request) {
     const code = String(randomInt(1000000)).padStart(6, '0');
     await sendMail(
       email,
-      'Verify your TechCare account',
-      `Your TechCare verification code is ${code}. It expires in 15 minutes. If you did not register, ignore this email.`,
+      codeEmail({
+        subject: 'Verify your TechCare account',
+        heading: 'Verify your email',
+        intro: 'Welcome to TechCare! Enter this code to finish creating your account.',
+        label: 'TechCare verification code',
+        code,
+        note: 'If you did not register, you can ignore this email.',
+      }),
       demo,
     );
     const hash = passwordHash(password),
@@ -625,8 +631,15 @@ async function post(path, d, me, request) {
       code = String(randomInt(1000000)).padStart(6, '0');
       await sendMail(
         email,
-        'Your new TechCare verification code',
-        `Your code is ${code}. It expires in 15 minutes.`,
+        codeEmail({
+          subject: 'Your new TechCare verification code',
+          heading: 'Your new code',
+          intro:
+            'Here is a fresh code to verify your TechCare account. Earlier codes no longer work.',
+          label: 'TechCare verification code',
+          code,
+          note: 'If you did not request this, you can ignore this email.',
+        }),
         demo,
       );
       await run(
@@ -674,8 +687,15 @@ async function post(path, d, me, request) {
       try {
         await sendMail(
           email,
-          'Reset your TechCare password',
-          `Open TechCare, choose Sign In, then Reset password with a token. Your single-use reset token is ${token}. It expires in 15 minutes. If you did not request this, ignore this email.`,
+          codeEmail({
+            subject: 'Reset your TechCare password',
+            heading: 'Reset your password',
+            intro:
+              'Open TechCare, choose Sign In, then Reset password with a token, and paste this single-use token.',
+            label: 'Password reset token',
+            code: token,
+            note: 'If you did not request this, you can ignore this email; your password stays the same.',
+          }),
           demo,
         );
         await transaction(async () => {

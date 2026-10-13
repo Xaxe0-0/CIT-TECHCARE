@@ -12,12 +12,19 @@ if (!process.env.TECHCARE_SMTP_HOST || !process.env.TECHCARE_SMTP_FROM) {
   console.error('Set TECHCARE_SMTP_HOST and TECHCARE_SMTP_FROM in .env.local first.');
   process.exit(1);
 }
-const { sendMail } = await import('../backend/src/services/mail.mjs');
+const { sendMail, codeEmail } = await import('../backend/src/services/mail.mjs');
 try {
+  // A sample verification email, so the design can be checked in a real inbox.
   await sendMail(
     to,
-    'TechCare test email',
-    'This test confirms TechCare can send verification codes.',
+    codeEmail({
+      subject: 'TechCare test email',
+      heading: 'Verify your email',
+      intro: 'This is a test. TechCare can send verification codes from this server.',
+      label: 'TechCare verification code',
+      code: '482913',
+      note: 'This code is only a sample and does not work.',
+    }),
     false,
   );
   console.log(
