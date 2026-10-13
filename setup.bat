@@ -20,10 +20,12 @@ if not defined CHOICE (
   echo   --------
   echo   1. Start TechCare [default]
   echo   2. Set up everything: dependencies, settings, database, and local AI
+  echo   3. Share online at your Cloudflare domain
   echo.
-  set /p "CHOICE=Choose 1 or 2 and press Enter [1]: "
+  set /p "CHOICE=Choose 1, 2, or 3 and press Enter [1]: "
 )
 if "!CHOICE!"=="2" goto setup
+if "!CHOICE!"=="3" goto share
 goto start
 
 :setup
@@ -62,7 +64,79 @@ if errorlevel 1 (
 
 echo.
 echo [4/5] Setting up the local AI assistant...
+call :share
+if not exist "node_modules" (
+  echo TechCare is not set up yet. Run this again and choose option 2 first.
+  goto fail
+)
+echo.
+echo [1/5] Checking the sharing settings...
+call node scripts\setup-sharing.mjs
+if errorlevel 1 goto fail
+set "PUBLIC_ORIGIN="
+for /f "usebackq eol=# tokens=1,* delims==" %%a in (".env.production.local") do (
+  if "%%a"=="TECHCARE_ORIGIN" set "PUBLIC_ORIGIN=%%b"
+)
+set "PUBLIC_HOST=!PUBLIC_ORIGIN:https://=!"
+
+echo.
+echo [2/5] Checking Cloudflare Tunnel...
+call :find_cloudflared
+if not defined CLOUDFLARED (
+  where winget >nul 2>nul
+  if not errorlevel 1 (
+    echo cloudflared is not installed. Installing it with winget...
+    winget install --id Cloudflare.cloudflared -e --silent --accept-source-agreements --accept-package-agreements
+    call :find_cloudflared
+  )
+)
+if not defined CLOUDFLARED (
+  echo Install cloudflared from https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/
+  echo then run option 3 again.
+  goto fail
+)
+if not exist "%USERPROFILE%\.cloudflared\cert.pem" (
+  echo A browser window will open. Sign in to Cloudflare and choose !PUBLIC_HOST!.
+  "!CLOUDFLARED!" tunnel login
+  if errorlevel 1 goto fail
+)
+"!CLOUDFLARED!" tunnel info techcare >nul 2>nul
+if errorlevel 1 (
+  echo Creating the "techcare" tunnel...
+  "!CLOUDFLARED!" tunnel create techcare
+  if errorlevel 1 goto fail
+)
+echo Pointing !PUBLIC_HOST! at the tunnel...
+"!CLOUDFLARED!" tunnel route dns --overwrite-dns techcare !PUBLIC_HOST!
+if errorlevel 1 goto fail
+
+echo.
+echo [3/5] Starting the local AI assistant if available...
 call :find_ollama
+if defined OLLAMA call :start_ollama
+
+echo.
+echo [4/5] Building the production version...
+call npm run build
+if errorlevel 1 goto fail
+
+echo.
+echo [5/5] Sharing TechCare at !PUBLIC_ORIGIN!
+echo Keep this window and the "TechCare tunnel" window open while people use it.
+echo Press Ctrl+C here to stop, then close the tunnel window.
+start "TechCare tunnel" /min "!CLOUDFLARED!" tunnel run --url http://127.0.0.1:3100 techcare
+set "PORT=3100"
+call npm start
+goto end
+
+:find_cloudflared
+set "CLOUDFLARED="
+for /f "delims=" %%p in ('where cloudflared 2^>nul') do if not defined CLOUDFLARED set "CLOUDFLARED=%%p"
+if not defined CLOUDFLARED if exist "%ProgramFiles(x86)%\cloudflared\cloudflared.exe" set "CLOUDFLARED=%ProgramFiles(x86)%\cloudflared\cloudflared.exe"
+if not defined CLOUDFLARED if exist "%ProgramFiles%\cloudflared\cloudflared.exe" set "CLOUDFLARED=%ProgramFiles%\cloudflared\cloudflared.exe"
+exit /b 0
+
+:find_ollama
 if not defined OLLAMA (
   where winget >nul 2>nul
   if not errorlevel 1 (

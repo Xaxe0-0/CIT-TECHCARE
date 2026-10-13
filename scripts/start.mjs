@@ -4,8 +4,10 @@ import { assertDatabaseReady } from '../backend/src/config/db.mjs';
 import { assertConfig } from '../backend/src/middleware/auth.mjs';
 import { assertMailConfig } from '../backend/src/services/mail.mjs';
 import { startNextServer } from './next-server.mjs';
-nextEnv.loadEnvConfig(process.cwd());
+// Set before the first env load: later reloads (next.config.mjs) restore the env as it was then.
 process.env.NODE_ENV = 'production';
+process.env.TECHCARE_BUILD_DIR = '.next-production';
+nextEnv.loadEnvConfig(process.cwd());
 assertConfig();
 let origin;
 try {
@@ -24,5 +26,4 @@ if (
 await assertDatabaseReady();
 assertObjectStorageConfig();
 assertMailConfig();
-process.env.TECHCARE_BUILD_DIR = '.next-production';
 await startNextServer(false);

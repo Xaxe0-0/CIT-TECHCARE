@@ -99,6 +99,56 @@ setup_all() {
   start_app
 }
 
+share_online() {
+  if [ ! -d node_modules ]; then
+    echo "TechCare is not set up yet. Run ./setup.sh 2 first."
+    exit 1
+  fi
+  echo
+  echo "[1/5] Checking the sharing settings..."
+  node scripts/setup-sharing.mjs || exit 1
+  origin=$(grep -E '^TECHCARE_ORIGIN=' .env.production.local | tail -n 1 | cut -d= -f2-)
+  host=${origin#https://}
+
+  echo
+  echo "[2/5] Checking Cloudflare Tunnel..."
+  if ! command -v cloudflared >/dev/null 2>&1; then
+    if [ "$(uname -s)" = Darwin ] && command -v brew >/dev/null 2>&1; then
+      brew install cloudflared
+    else
+      echo "Install cloudflared from https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/"
+      echo "then run ./setup.sh 3 again."
+      exit 1
+    fi
+  fi
+  if [ ! -f "$HOME/.cloudflared/cert.pem" ]; then
+    echo "A browser window will open. Sign in to Cloudflare and choose $host."
+    cloudflared tunnel login || exit 1
+  fi
+  if ! cloudflared tunnel info techcare >/dev/null 2>&1; then
+    echo "Creating the \"techcare\" tunnel..."
+    cloudflared tunnel create techcare || exit 1
+  fi
+  echo "Pointing $host at the tunnel..."
+  cloudflared tunnel route dns --overwrite-dns techcare "$host" || exit 1
+
+  echo
+  echo "[3/5] Starting the local AI assistant if available..."
+  start_ollama
+
+  echo
+  echo "[4/5] Building the production version..."
+  npm run build || exit 1
+
+  echo
+  echo "[5/5] Sharing TechCare at $origin"
+  echo "Keep this window open while people use it. Press Ctrl+C to stop."
+  cloudflared tunnel run --url http://127.0.0.1:3100 techcare >/dev/null 2>&1 &
+  tunnel=$!
+  trap 'kill "$tunnel" 2>/dev/null' EXIT
+  PORT=3100 npm start
+}
+
 choice=${1:-}
 if [ -z "$choice" ]; then
   echo
@@ -106,7 +156,12 @@ if [ -z "$choice" ]; then
   echo "  --------"
   echo "  1. Start TechCare [default]"
   echo "  2. Set up everything: dependencies, settings, database, and local AI"
+  echo "  3. Share online at your Cloudflare domain"
   echo
-  read -r -p "Choose 1 or 2 and press Enter [1]: " choice
+  read -r -p "Choose 1, 2, or 3 and press Enter [1]: " choice
 fi
-if [ "$choice" = 2 ]; then setup_all; else start_app; fi
+case "$choice" in
+  2) setup_all ;;
+  3) share_online ;;
+  *) start_app ;;
+esac

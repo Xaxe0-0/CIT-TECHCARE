@@ -194,7 +194,10 @@ export function GuideAssistant({ onAsk }: { onAsk: () => void }) {
                 )}
                 {reply.pending && !reply.text ? (
                   <p className="assistant-thinking" role="status">
-                    Thinking…
+                    <span className="sr-only">TechCare is thinking</span>
+                    <span aria-hidden="true" />
+                    <span aria-hidden="true" />
+                    <span aria-hidden="true" />
                   </p>
                 ) : (
                   <p className={reply.source ? 'assistant-answer' : undefined}>{reply.text}</p>

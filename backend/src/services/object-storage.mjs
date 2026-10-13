@@ -9,6 +9,9 @@ import { join } from 'node:path';
 import { dataDir } from '../config/db.mjs';
 
 let client;
+// Production needs B2 unless the operator serves from this one computer and opts into local files.
+const requireB2 = () =>
+  process.env.NODE_ENV === 'production' && process.env.TECHCARE_LOCAL_STORAGE !== '1';
 
 function b2Config() {
   const values = [
@@ -69,7 +72,7 @@ function localPath(key) {
 
 export function assertObjectStorageConfig() {
   const config = b2Config();
-  if (process.env.NODE_ENV === 'production' && !config)
+  if (requireB2() && !config)
     throw new Error('Configure Backblaze B2 before starting in production.');
 }
 
@@ -88,8 +91,7 @@ export async function putObject(key, body, contentType) {
     );
     return;
   }
-  if (process.env.NODE_ENV === 'production')
-    throw new Error('Backblaze B2 is required in production.');
+  if (requireB2()) throw new Error('Backblaze B2 is required in production.');
   const path = localPath(key);
   await mkdir(join(dataDir(), 'media'), { recursive: true });
   await writeFile(path, body, { flag: 'wx' });
@@ -111,7 +113,6 @@ export async function removeObject(key) {
     await s3(config).send(new DeleteObjectCommand({ Bucket: config.bucket, Key: key }));
     return;
   }
-  if (process.env.NODE_ENV === 'production')
-    throw new Error('Backblaze B2 is required in production.');
+  if (requireB2()) throw new Error('Backblaze B2 is required in production.');
   await unlink(localPath(key));
 }
