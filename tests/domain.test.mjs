@@ -606,10 +606,26 @@ try {
         const pair = one('SELECT * FROM friendships');
         assert.equal(all('SELECT * FROM friendships').length, 1);
         const recipient = pair.receiver === bid ? b : a,
+          requester = recipient === b ? a : b,
           target = pair.sender;
+        assert.equal((await call(guest, 'inbox')).status, 401);
+        assert.deepEqual(
+          (await call(recipient, 'inbox')).data.requests.map((u) => u.id),
+          [target],
+        );
+        assert.deepEqual(
+          (await call(requester, 'inbox')).data.sent.map((u) => u.id),
+          [pair.receiver],
+        );
         assert.equal(
           (await call(recipient, 'friend', { user_id: target, action: 'accept' })).status,
           200,
+        );
+        const inbox = (await call(recipient, 'inbox')).data;
+        assert.equal(inbox.requests.length, 0);
+        assert.deepEqual(
+          inbox.conversations.map((u) => [u.id, u.unread, u.last]),
+          [[target, 0, null]],
         );
         assert.equal((await call(a, avatar.replace('/api/', ''))).status, 200);
         assert.equal(
@@ -629,7 +645,13 @@ try {
       async () => {
         const message = await call(b, 'messages', { user_id: aid, body: 'A private test message' });
         assert.equal(message.status, 201);
+        const unread = (await call(a, 'inbox')).data;
+        assert.equal(unread.unread, 1);
+        assert.equal(unread.conversations[0].last.body, 'A private test message');
+        assert.equal(unread.conversations[0].last.mine, false);
+        assert.equal((await call(b, 'inbox')).data.unread, 0);
         assert.equal((await call(a, 'messages?user=' + bid)).data.messages.length, 1);
+        assert.equal((await call(a, 'inbox')).data.unread, 0);
         assert.equal((await call(c, 'messages?user=' + bid)).status, 403);
         assert.equal(
           (

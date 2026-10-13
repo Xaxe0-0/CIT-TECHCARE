@@ -1,4 +1,4 @@
--- TechCare MySQL 8.0.16+ schema (latest application schema, migration version 7).
+-- TechCare MySQL 8.0.16+ schema (latest application schema, migration version 8).
 -- Select the application database before applying this file.
 SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -153,8 +153,10 @@ CREATE TABLE IF NOT EXISTS messages (
   receiver INT UNSIGNED NOT NULL,
   body TEXT NOT NULL,
   created BIGINT NOT NULL,
+  seen TINYINT UNSIGNED NOT NULL DEFAULT 0,
   PRIMARY KEY (id),
   KEY message_pair (sender,receiver,id),
+  KEY message_unread (receiver,seen),
   CONSTRAINT messages_sender_fk FOREIGN KEY (sender) REFERENCES users(id),
   CONSTRAINT messages_receiver_fk FOREIGN KEY (receiver) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -352,4 +354,4 @@ CREATE TABLE IF NOT EXISTS item_inquiries (
 
 INSERT IGNORE INTO migrations (version,applied)
 VALUES (1,UNIX_TIMESTAMP()),(2,UNIX_TIMESTAMP()),(3,UNIX_TIMESTAMP()),
-       (4,UNIX_TIMESTAMP()),(5,UNIX_TIMESTAMP()),(6,UNIX_TIMESTAMP()),(7,UNIX_TIMESTAMP());
+       (4,UNIX_TIMESTAMP()),(5,UNIX_TIMESTAMP()),(6,UNIX_TIMESTAMP()),(7,UNIX_TIMESTAMP()),(8,UNIX_TIMESTAMP());

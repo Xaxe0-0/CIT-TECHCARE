@@ -335,7 +335,59 @@ async function get(path, url, me, request) {
       me.id,
       before,
     );
+    // Opening the latest page of a conversation reads it; idempotent and limited to own messages.
+    if (!url.searchParams.get('before'))
+      await run(
+        'UPDATE messages SET seen=1 WHERE sender=? AND receiver=? AND seen=0',
+        other,
+        me.id,
+      );
     return json({ messages: rows.slice(0, 100).reverse(), hasMore: rows.length > 100 });
+  }
+  if (path === 'inbox') {
+    requireUser(me);
+    const pending = async (sql) => Promise.all((await all(sql, me.id)).map((u) => member(u, me)));
+    const friends = await all(
+      `SELECT u.id,u.name,u.role,u.avatar,
+      (SELECT max(m.id) FROM messages m WHERE (m.sender=u.id AND m.receiver=?) OR (m.sender=? AND m.receiver=u.id)) AS lastId,
+      (SELECT count(*) FROM messages m WHERE m.sender=u.id AND m.receiver=? AND m.seen=0) AS unread
+      FROM friendships f JOIN users u ON u.id=CASE WHEN f.sender=? THEN f.receiver ELSE f.sender END
+      WHERE f.status='accepted' AND (f.sender=? OR f.receiver=?) LIMIT 500`,
+      ...Array(6).fill(me.id),
+    );
+    const ids = friends.map((f) => f.lastId).filter(Boolean);
+    const last = new Map(
+      (ids.length
+        ? await all(
+            `SELECT id,sender,body,created FROM messages WHERE id IN (${ids.map(() => '?').join(',')})`,
+            ...ids,
+          )
+        : []
+      ).map((m) => [m.id, m]),
+    );
+    const conversations = friends
+      .map(({ lastId, ...friend }) => {
+        const m = last.get(lastId);
+        return {
+          ...friend,
+          last: m
+            ? { body: m.body.slice(0, 80), created: m.created, mine: m.sender === me.id }
+            : null,
+        };
+      })
+      .sort(
+        (a, b) => (b.last?.created || 0) - (a.last?.created || 0) || a.name.localeCompare(b.name),
+      );
+    return json({
+      requests: await pending(
+        "SELECT u.* FROM friendships f JOIN users u ON u.id=f.sender WHERE f.receiver=? AND f.status='pending' ORDER BY f.created DESC LIMIT 100",
+      ),
+      sent: await pending(
+        "SELECT u.* FROM friendships f JOIN users u ON u.id=f.receiver WHERE f.sender=? AND f.status='pending' ORDER BY f.created DESC LIMIT 100",
+      ),
+      conversations,
+      unread: conversations.reduce((total, c) => total + c.unread, 0),
+    });
   }
   if (path === 'resources')
     return json(

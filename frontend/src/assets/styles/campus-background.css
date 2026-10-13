@@ -419,16 +419,16 @@ body {
   box-shadow: inset 0 1px 0 var(--glass-highlight);
 }
 
-.nav-icon {
-  background: var(--glass-control);
-  border-color: var(--glass-edge);
-  box-shadow: inset 0 1px 0 var(--glass-highlight);
+/* Only the active page keeps an icon tile; hover tints the row, never a box within a box. */
+.sidebar .nav-item:not(.active) .nav-icon {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
 }
 
 .sidebar .nav-item.active,
 .sidebar .nav-item:hover,
 .sidebar-toggle:hover,
-.nav-item:hover .nav-icon,
 .campus-content .quick-link:hover,
 .campus-content .guide-card:hover,
 .campus-content .button.secondary:hover,

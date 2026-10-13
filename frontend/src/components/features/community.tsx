@@ -1,34 +1,21 @@
 'use client';
 import { useState, useEffect } from 'react';
-import {
-  ChatCircleDots,
-  SignIn,
-  UserPlus,
-  Users,
-  LockKey,
-  PaperPlaneTilt,
-  Flag,
-  Prohibit,
-} from '@phosphor-icons/react';
+import { ChatCircleDots, SignIn, UserPlus, Users, LockKey } from '@phosphor-icons/react';
 import { useTechCare } from '@/context/techcare-context';
 import {
   Avatar,
   Badge,
   Empty,
   ErrorState,
-  Form,
   Loading,
-  Modal,
   PageHeading,
   Pagination,
   Search,
-  Success,
-  TextArea,
-  date,
 } from '../ui/ui';
-import { api, ApiError } from '@/services/api';
+import { api } from '@/services/api';
 import { useData } from '@/hooks/use-data';
-import type { User, Message, Result } from '@shared/types';
+import { Conversation } from './community-extras';
+import type { User } from '@shared/types';
 
 export { Discussion } from './discussion';
 export function Members() {
@@ -181,148 +168,5 @@ export function Members() {
         <Conversation person={conversation} close={() => setConversation(null)} />
       )}
     </>
-  );
-}
-function Conversation({ person, close }: { person: User; close: () => void }) {
-  const { user, version, notify, refresh } = useTechCare(),
-    [before, setBefore] = useState<number | null>(null),
-    [report, setReport] = useState<Message | null>(null),
-    [reportNotice, setReportNotice] = useState(''),
-    [accessError, setAccessError] = useState('');
-  const result = useData<{ messages: Message[]; hasMore: boolean }>(
-    `messages?user=${person.id}${before ? `&before=${before}` : ''}`,
-    version,
-  );
-  // Recheck friendship on focus and periodically while a conversation is open.
-  useEffect(() => {
-    const controller = new AbortController();
-    async function checkAccess() {
-      try {
-        await api(`messages/access?user=${person.id}`, undefined, controller.signal);
-      } catch (error) {
-        if (error instanceof ApiError && [401, 403].includes(error.status)) {
-          setAccessError(error.message);
-          setReport(null);
-          setReportNotice('');
-        }
-      }
-    }
-    const timer = setInterval(checkAccess, 15000);
-    window.addEventListener('focus', checkAccess);
-    return () => {
-      clearInterval(timer);
-      window.removeEventListener('focus', checkAccess);
-      controller.abort();
-    };
-  }, [person.id]);
-  return (
-    <Modal
-      title={`Message ${person.name}`}
-      description="Messages are available only while you are accepted friends. This is not a real-time chat."
-      onClose={close}
-      wide
-    >
-      {reportNotice && <Success>{reportNotice}</Success>}
-      {accessError ? (
-        <div className="error-message" role="alert">
-          {accessError}
-        </div>
-      ) : result.loading ? (
-        <Loading />
-      ) : result.error ? (
-        <ErrorState message={result.error} retry={result.reload} />
-      ) : (
-        <>
-          <div className="message-history">
-            {result.data?.hasMore && (
-              <button
-                className="text-button"
-                onClick={() => setBefore(result.data!.messages[0].id)}
-              >
-                Earlier messages
-              </button>
-            )}
-            {before && (
-              <button className="text-button" onClick={() => setBefore(null)}>
-                Latest messages
-              </button>
-            )}
-            {result.data?.messages.length ? (
-              result.data.messages.map((m) => (
-                <div
-                  className={`message ${m.sender === user?.id ? 'sent' : 'received'}`}
-                  key={m.id}
-                >
-                  <p>{m.body}</p>
-                  <small>{date(m.created)}</small>
-                  {m.sender !== user?.id && (
-                    <button
-                      className="icon-button"
-                      aria-label="Report this message"
-                      onClick={() => setReport(m)}
-                    >
-                      <Flag size={14} />
-                    </button>
-                  )}
-                </div>
-              ))
-            ) : (
-              <Empty title="Say hello">A helpful conversation starts here.</Empty>
-            )}
-          </div>
-          <Form
-            submit="Send message"
-            reset
-            onSubmit={async (values) => {
-              await api('messages', { ...values, user_id: person.id });
-              setBefore(null);
-              result.reload();
-            }}
-          >
-            <TextArea
-              label="New message"
-              name="body"
-              min={1}
-              max={1000}
-              placeholder="Write your message…"
-            />
-          </Form>
-        </>
-      )}
-      <button
-        className="text-button danger"
-        onClick={async () => {
-          try {
-            await api('block', { user_id: person.id, action: 'block' });
-            refresh();
-            close();
-            notify('Member blocked. Messaging and friendship access have been revoked.');
-          } catch (e) {
-            notify((e as Error).message);
-          }
-        }}
-      >
-        <Prohibit size={16} /> Block member
-      </button>
-      {report && (
-        <div className="report-form">
-          <h3>Report this message</h3>
-          <p>Staff will see only the reported message and your reason.</p>
-          <Form
-            submit="Send report"
-            onSubmit={async (values) => {
-              const r = await api<Result>('message-report', { ...values, message_id: report.id });
-              setReport(null);
-              setReportNotice(r.message!);
-            }}
-          >
-            <TextArea label="Reason for reporting" name="reason" min={10} max={500} />
-          </Form>
-          <button className="text-button" onClick={() => setReport(null)}>
-            Cancel report
-          </button>
-        </div>
-      )}
-    </Modal>
   );
 }

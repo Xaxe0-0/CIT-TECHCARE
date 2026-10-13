@@ -11,7 +11,7 @@
    npm run setup
    ```
 
-6. Set `TECHCARE_DB_HOST`, `TECHCARE_DB_PORT`, `TECHCARE_DB_NAME`, `TECHCARE_DB_USER`, and `TECHCARE_DB_SSL=0` in the root `.env.local` for local development. Leave `TECHCARE_DB_PASSWORD=` blank if your MySQL account has no password; otherwise set its password. Apply `backend/schema/mysql.sql` to the selected database. Keep any database password private.
+6. Set `TECHCARE_DB_HOST`, `TECHCARE_DB_PORT`, `TECHCARE_DB_NAME`, `TECHCARE_DB_USER`, and `TECHCARE_DB_SSL=0` in the root `.env.local` for local development. Leave `TECHCARE_DB_PASSWORD=` blank if your MySQL account has no password; otherwise set its password. Apply `backend/schema/mysql.sql` to the selected database. A database created before message read state (schema version 7) needs `backend/schema/mysql-upgrade-8.sql` applied once instead. Keep any database password private.
 
    ```powershell
    npm run create-admin

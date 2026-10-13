@@ -430,6 +430,54 @@
 .notifications-panel > a.unread {
   background: var(--blue-light);
 }
+.inbox-panel h3 {
+  margin: 1.1rem 0 0.3rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.inbox-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.6rem 0.5rem;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+}
+button.inbox-row {
+  cursor: pointer;
+}
+button.inbox-row:hover,
+.inbox-row.unread {
+  background: var(--blue-light);
+}
+.inbox-copy {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.inbox-copy small {
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.inbox-unread {
+  min-width: 1.5rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: var(--blue);
+  color: var(--surface);
+  font-size: 0.75rem;
+  text-align: center;
+}
 .item-inquiries {
   margin: 1rem 0;
   padding: 1rem;
