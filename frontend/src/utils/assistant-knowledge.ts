@@ -32,7 +32,7 @@ export const helpTopics: HelpTopic[] = [
     question: 'What can you help with?',
     matches: [
       /\b(chatbot|assistant|chatgpt|openai|api|ai|bot)\b/,
-      /what can you|who are you|are you human|how do you work/,
+      /what can (you|u)|(who|what) (are|r) (you+|u+)\b|are (you|u) (a )?(human|real|robot)|how do (you|u) work|\b(sino|ano) ka\b/,
     ],
     answer:
       'I’m TechCare’s help assistant. I explain how this website works and share troubleshooting guides from the project’s help content. When the site runs a local AI model, I also answer common tech problems, using verified fixes where they match. There is no ChatGPT account or paid AI service. I cannot view your account, perform actions for you, or answer general-knowledge questions; for those, ask the community.',

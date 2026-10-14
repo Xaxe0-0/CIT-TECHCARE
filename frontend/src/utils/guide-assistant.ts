@@ -63,15 +63,31 @@ export function getGuideReply(
       link: { href: '/booth', label: 'Find support' },
     };
   }
-  if (/^(thanks|thank you|thankyou|salamat)[!. ]*$/.test(text)) {
+  // Small talk is matched with stretched letters collapsed ("hiiii" → "hi", "thank youuu" → "thank you").
+  const casual = text.replace(/(.)\1+/g, '$1');
+  if (/^(thanks?|thank ?(you|u)|thanx|tnx|ty|salamat)( (po|so much|a lot))?[!.~ ]*$/.test(casual)) {
     return {
       text: 'You’re welcome! What else would you like to know about TechCare?',
       topic: previousTopic,
     };
   }
-  if (/^(hi|hello|hey|help)[!.? ]*$/.test(text)) {
+  if (
+    /^(hi|hiya|helo|hey|heya|hay|yo|sup|hola|help|god (morning|afternoon|evening|day)|kumusta|kamusta|musta)( (po|there|techcare|bot))?[!.?~ ]*$/.test(
+      casual,
+    )
+  ) {
     return {
       text: 'Hello! Ask me about using TechCare or troubleshooting a device. You can start with one of these questions.',
+      choices: helpSuggestions,
+    };
+  }
+  if (
+    /^(why|what|huh|ok|okay|oki|k|cool|nice|wow|lol|lmao|(ha|he)+|hm|ah|oh|eh|yes|yeah|ya|no|nope|sure|idk|bruh|test|testing)[!.?~ ]*$/.test(
+      casual,
+    )
+  ) {
+    return {
+      text: 'Could you tell me a bit more? Ask me about using TechCare or describe a device problem, or pick one of these questions.',
       choices: helpSuggestions,
     };
   }
