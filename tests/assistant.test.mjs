@@ -112,6 +112,15 @@ try {
     assert.equal(Object.keys(filipinoFixes).length, techFixes.length);
   });
 
+  await test('non-tech questions get a plain off-topic note without the model', async () => {
+    requests.length = 0;
+    const english = await ask({ message: 'What is the capital of France?' });
+    assert.equal(english.source, 'off-topic');
+    assert.match(english.text, /not a tech question/);
+    assert.match((await ask({ message: 'sino ang presidente ng pilipinas' })).text, /Hindi iyan/);
+    assert.ok(!requests.length, 'the model is not asked');
+  });
+
   await test('Filipino detection', () => {
     for (const text of [
       'ayaw mag-on ng laptop ko',

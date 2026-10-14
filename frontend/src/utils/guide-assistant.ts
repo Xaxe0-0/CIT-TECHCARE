@@ -43,6 +43,36 @@ const topics = [
   { icon: 'shield', pattern: /\b(suspicious|phishing|scam|fraud|spam|safety|hacked|malicious)\b/ },
 ];
 
+// Exact + - * / with brackets for questions like "what is 1+1?"; null for anything else.
+function calculate(expression: string): number | null {
+  const plain = expression.replace(/[x×]/g, '*').replace(/÷/g, '/').replace(/\s+/g, '');
+  const tokens = plain.match(/\d+(?:\.\d+)?|[-+*/()]/g);
+  if (!tokens || tokens.join('') !== plain) return null;
+  let i = 0;
+  const factor = (): number => {
+    const token = tokens[i++];
+    if (token === '(') {
+      const value = sum();
+      return tokens[i++] === ')' ? value : NaN;
+    }
+    return token === '-' ? -factor() : Number(token);
+  };
+  const product = () => {
+    let value = factor();
+    while (tokens[i] === '*' || tokens[i] === '/')
+      value = tokens[i++] === '*' ? value * factor() : value / factor();
+    return value;
+  };
+  const sum = (): number => {
+    let value = product();
+    while (tokens[i] === '+' || tokens[i] === '-')
+      value = tokens[i++] === '+' ? value + product() : value - product();
+    return value;
+  };
+  const value = sum();
+  return i === tokens.length && Number.isFinite(value) ? Math.round(value * 1e10) / 1e10 : null;
+}
+
 function topicReply(topic: HelpTopic, detailed = false, fil = false): GuideReply {
   return {
     text: (fil && topic.answerFil) || topic.answer,
@@ -58,6 +88,8 @@ export function getGuideReply(
   message: string,
   previousTopic?: string,
   guides: Guide[] = defaultGuides,
+  // The signed-in member (null when signed out); undefined when the caller does not know.
+  user?: { name: string } | null,
 ): GuideReply {
   const text = message.toLowerCase().replace(/[’']/g, ' ').replace(/\s+/g, ' ').trim();
   // Conversational replies follow the person's language; guides and help topics stay in English.
@@ -109,6 +141,37 @@ export function getGuideReply(
       text: say(
         'Could you tell me a bit more? Ask me about using TechCare or describe a device problem, or pick one of these questions.',
         'Puwede mo bang ikuwento nang mas detalyado? Magtanong tungkol sa TechCare o ilarawan ang problema ng device mo, o pumili ng isa sa mga tanong na ito.',
+      ),
+      choices: helpSuggestions,
+    };
+  }
+  if (user !== undefined && /^(who am i|sino ako|do you know (me|who i am))[!.? ]*$/.test(text))
+    return user
+      ? {
+          text: say(
+            `You’re signed in as ${user.name}. I can’t see the rest of your account, but you can view and edit your profile in My Dashboard.`,
+            `Naka-sign in ka bilang ${user.name}. Hindi ko nakikita ang iba pang detalye ng account mo, pero makikita at mae-edit mo ang profile mo sa My Dashboard.`,
+          ),
+          link: { href: '/profile', label: say('Open My Dashboard', 'Buksan ang My Dashboard') },
+        }
+      : {
+          text: say(
+            'You’re not signed in, so I don’t know who you are. Sign in to see your profile and dashboard.',
+            'Hindi ka pa naka-sign in, kaya hindi ko alam kung sino ka. Mag-sign in para makita ang profile at dashboard mo.',
+          ),
+          link: { href: '/login', label: say('Sign in', 'Mag-sign in') },
+        };
+  const math =
+    /^(?:what is |what s |whats |how much is |calculate |ano ang |magkano ang |ilan ang )?([\d\s.()]*\d[\d\s.()]*(?:[-+*/x×÷][\d\s.()]+)+)[=? ]*$/.exec(
+      text,
+    );
+  const result = math ? calculate(math[1]) : null;
+  if (math && result !== null) {
+    const sum = `${math[1].trim()} = ${result}`;
+    return {
+      text: say(
+        `${sum}. That’s not a tech question, but it’s an easy one! I’m here for TechCare and device problems.`,
+        `${sum}. Hindi iyan tanong tungkol sa tech, pero madali lang! Nandito ako para sa TechCare at sa mga problema sa device.`,
       ),
       choices: helpSuggestions,
     };

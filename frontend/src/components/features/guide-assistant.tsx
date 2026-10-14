@@ -34,7 +34,7 @@ const welcome: Message = {
 };
 
 export function GuideAssistant({ onAsk }: { onAsk: () => void }) {
-  const { version } = useTechCare();
+  const { version, user } = useTechCare();
   const [activated, setActivated] = useState(false);
   const library = useData<{ guides: Guide[] }>(activated ? 'guides' : null, version);
   const guides = library.data?.guides || [];
@@ -81,8 +81,13 @@ export function GuideAssistant({ onAsk }: { onAsk: () => void }) {
         signal: controller.signal,
       });
       if (!response.ok || !response.body) throw new Error('unavailable');
-      const source =
-        response.headers.get('X-TechCare-Answer') === 'verified' ? 'verified' : 'generated';
+      const kind = response.headers.get('X-TechCare-Answer');
+      // A non-tech question gets a plain note from the server, not an AI answer or Discussion link.
+      if (kind === 'off-topic') {
+        update(id, { text: await response.text(), choices: helpSuggestions });
+        return;
+      }
+      const source = kind === 'verified' ? 'verified' : 'generated';
       const filipino = isFilipino(text);
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -138,7 +143,7 @@ export function GuideAssistant({ onAsk }: { onAsk: () => void }) {
     const text = value.trim().slice(0, 400);
     if (!text || busy) return;
     const question: Message = { id: ++sequence.current, role: 'user', reply: { text } };
-    const builtIn = getGuideReply(text, contextTopic ?? topic.current, guides);
+    const builtIn = getGuideReply(text, contextTopic ?? topic.current, guides, user);
     const ai = builtIn.fallback && aiEnabled;
     const answer: Message = {
       id: ++sequence.current,

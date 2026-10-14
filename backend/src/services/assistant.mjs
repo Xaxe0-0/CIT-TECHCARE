@@ -141,7 +141,16 @@ export async function streamAnswer(d, me, signal) {
   await throttle('source:assistant', 30, 60);
   if (me) await throttle(`assistant:${me.id}`, 10, 60);
   const question = v.text(d.message, 'Question', 2, 400);
-  if (!looksTechnical(question)) return { source: 'generated', stream: textStream(ESCALATE) };
+  // Not a tech question: say so plainly instead of sending the person to Discussion.
+  if (!looksTechnical(question))
+    return {
+      source: 'off-topic',
+      stream: textStream(
+        isFilipino(question)
+          ? 'Hindi iyan tanong tungkol sa tech, kaya hindi ko iyan masasagot dito. Makakatulong ako sa mga feature ng TechCare at sa mga problema sa device, gaya ng Wi-Fi, printer, mabagal na laptop, o phone.'
+          : 'That’s not a tech question, so I can’t help with it here. I can help with TechCare features and device problems, like Wi-Fi, printers, slow laptops, or phones.',
+      ),
+    };
   const fix = await matchFix(question, signal);
   if (fix) {
     // Filipino questions get the hand-written Filipino fix; generated answers stay in English
