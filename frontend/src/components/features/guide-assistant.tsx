@@ -15,6 +15,7 @@ import { useData } from '@/hooks/use-data';
 import { useTechCare } from '@/context/techcare-context';
 import type { Guide } from '@shared/types';
 import { helpSuggestions } from '@/utils/assistant-knowledge';
+import { isFilipino } from '@shared/language.mjs';
 
 type Message = { id: number; role: 'user' | 'assistant'; reply: GuideReply };
 // Small models sometimes add markdown despite instructions; show plain text.
@@ -82,6 +83,7 @@ export function GuideAssistant({ onAsk }: { onAsk: () => void }) {
       if (!response.ok || !response.body) throw new Error('unavailable');
       const source =
         response.headers.get('X-TechCare-Answer') === 'verified' ? 'verified' : 'generated';
+      const filipino = isFilipino(text);
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let answer = '';
@@ -91,20 +93,37 @@ export function GuideAssistant({ onAsk }: { onAsk: () => void }) {
         answer += decoder.decode(value, { stream: true });
         // Hold back a reply that may be the decline word until it is clearly an answer.
         if (!'ESCALATE'.startsWith(answer.trim().toUpperCase()))
-          update(id, { text: tidy(answer), source, pending: true });
+          update(id, { text: tidy(answer), source, filipino, pending: true });
       }
+      const say = (english: string, tagalog: string) => (filipino ? tagalog : english);
       update(
         id,
-        /ESCALATE/.test(answer) || !answer.trim()
+        !/ESCALATE/.test(answer) && answer.trim()
           ? {
-              text: 'I can’t answer that one reliably. You can ask here in Discussion: describe your device and what you already tried, and the community can help.',
-              link: { href: '/discussion', label: 'Ask in Discussion' },
-            }
-          : {
               text: tidy(answer),
               source,
-              link: { href: '/discussion', label: 'Still stuck? Ask in Discussion' },
-            },
+              filipino,
+              link: {
+                href: '/discussion',
+                label: say(
+                  'Still stuck? Ask in Discussion',
+                  'Hindi pa rin ayos? Magtanong sa Discussion',
+                ),
+              },
+            }
+          : // A matching guide beats sending the person away.
+            builtIn.guide
+            ? { ...builtIn, fallback: false }
+            : {
+                text: say(
+                  'I can’t answer that one reliably. You can ask here in Discussion: describe your device and what you already tried, and the community can help.',
+                  'Hindi ako sigurado sa tamang sagot diyan. Puwede kang magtanong sa Discussion: ilarawan ang device mo at ang mga nasubukan mo na, at tutulong ang community.',
+                ),
+                link: {
+                  href: '/discussion',
+                  label: say('Ask in Discussion', 'Magtanong sa Discussion'),
+                },
+              },
       );
     } catch {
       if (!controller.signal.aborted) update(id, builtIn);
@@ -205,8 +224,12 @@ export function GuideAssistant({ onAsk }: { onAsk: () => void }) {
                 {reply.source && !reply.pending && (
                   <small className="assistant-answer-source">
                     {reply.source === 'verified'
-                      ? 'Verified TechCare fix'
-                      : 'AI-generated answer. Check that the steps match your device.'}
+                      ? reply.filipino
+                        ? 'Verified na TechCare fix'
+                        : 'Verified TechCare fix'
+                      : reply.filipino
+                        ? 'Sagot ng AI, nasa English para eksakto ang mga hakbang. Tiyaking tugma ito sa device mo.'
+                        : 'AI-generated answer. Check that the steps match your device.'}
                   </small>
                 )}
                 {reply.steps && (

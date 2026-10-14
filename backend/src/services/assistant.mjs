@@ -1,6 +1,8 @@
 import { Problem, throttle } from '../middleware/auth.mjs';
 import * as v from '../validations/validation.mjs';
 import { findFixes, looksTechnical } from './tech-fixes.mjs';
+import { filipinoFixes } from './tech-fixes-fil.mjs';
+import { isFilipino } from '../../../shared/src/language.mjs';
 
 // Answers come from local Ollama models in two steps:
 // 1. Keywords propose verified fixes and an embedding model checks one is about the same
@@ -141,13 +143,15 @@ export async function streamAnswer(d, me, signal) {
   const question = v.text(d.message, 'Question', 2, 400);
   if (!looksTechnical(question)) return { source: 'generated', stream: textStream(ESCALATE) };
   const fix = await matchFix(question, signal);
-  if (fix)
+  if (fix) {
+    // Filipino questions get the hand-written Filipino fix; generated answers stay in English
+    // because the local model's Filipino is not reliable enough for step-by-step help.
+    const { title, steps } = (isFilipino(question) && filipinoFixes[fix.title]) || fix;
     return {
       source: 'verified',
-      stream: textStream(
-        [`${fix.title}:`, ...fix.steps.map((step, i) => `${i + 1}. ${step}`)].join('\n'),
-      ),
+      stream: textStream([`${title}:`, ...steps.map((step, i) => `${i + 1}. ${step}`)].join('\n')),
     };
+  }
   const upstream = await ollama(
     {
       stream: true,

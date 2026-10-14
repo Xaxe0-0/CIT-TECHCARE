@@ -7,7 +7,9 @@ import { tmpdir } from 'node:os';
 import { join, relative, isAbsolute } from 'node:path';
 import { handle } from '../backend/src/controllers/api.mjs';
 import { closeDatabases } from '../backend/src/config/db.mjs';
-import { findFixes } from '../backend/src/services/tech-fixes.mjs';
+import { findFixes, techFixes } from '../backend/src/services/tech-fixes.mjs';
+import { filipinoFixes } from '../backend/src/services/tech-fixes-fil.mjs';
+import { isFilipino } from '../shared/src/language.mjs';
 
 const temporary = await mkdtemp(join(tmpdir(), 'techcare-assistant-'));
 process.env.TECHCARE_DB_DRIVER = 'sqlite';
@@ -76,6 +78,56 @@ try {
     assert.equal(answer.source, 'verified');
     assert.match(answer.text, /Settings > Bluetooth & devices > Printers & scanners/);
     assert.ok(!requests.some((r) => r.path === '/api/chat'), 'no model text in verified answers');
+  });
+
+  await test('Filipino questions get the hand-written Filipino fix', async () => {
+    const answer = await ask({ message: 'offline yung printer ko, ayaw mag-print' });
+    assert.equal(answer.source, 'verified');
+    assert.match(answer.text, /^Offline ang printer \(Windows 11\):/);
+    assert.match(answer.text, /Settings > Bluetooth & devices > Printers & scanners/);
+  });
+
+  await test('every verified fix has a Filipino version that keeps its menu paths', () => {
+    for (const fix of techFixes) {
+      const fil = filipinoFixes[fix.title];
+      assert.ok(fil, `missing Filipino fix: ${fix.title}`);
+      assert.equal(fil.steps.length, fix.steps.length, fix.title);
+      // Menu paths and shortcuts must survive translation: same number of "A > B" steps per line,
+      // every inner menu name intact, and every key combination intact.
+      fix.steps.forEach((step, i) => {
+        const translated = fil.steps[i];
+        const parts = step.split(' > ');
+        assert.equal(translated.split(' > ').length, parts.length, `${fix.title} step ${i + 1}`);
+        // A "segment" with a sentence break or "and"/"in" joins two separate paths, not a menu name.
+        for (const inner of parts
+          .slice(1, -1)
+          .filter((part) => !/[.;:] | (and|then|in|on) |\([a-z]{2,}/.test(part)))
+          assert.ok(translated.includes(` > ${inner} > `), `${fix.title}: lost "${inner}"`);
+        for (const keys of step.match(
+          /(?:[A-Z][a-z]*(?: key| Screen| Up| Down)?|\d)(?: \+ (?:[A-Z][a-z]*(?: key| Screen| Up| Down)?|\d))+/g,
+        ) || [])
+          assert.ok(translated.includes(keys), `${fix.title}: lost "${keys}"`);
+      });
+    }
+    assert.equal(Object.keys(filipinoFixes).length, techFixes.length);
+  });
+
+  await test('Filipino detection', () => {
+    for (const text of [
+      'ayaw mag-on ng laptop ko',
+      'bakit mabagal',
+      'hi po',
+      'kumusta',
+      'i-restart ko na ba',
+    ])
+      assert.ok(isFilipino(text), text);
+    for (const text of [
+      'my laptop is slow',
+      'may i ask about wifi',
+      'who are u',
+      'printer offline',
+    ])
+      assert.ok(!isFilipino(text), text);
   });
 
   await test('other questions stream generated tokens within the token budget', async () => {
