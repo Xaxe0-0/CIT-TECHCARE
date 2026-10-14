@@ -59,17 +59,120 @@ const cell = (value) => {
   const text = String(value);
   return '"' + (/^[=+\-@\t\r]/.test(text) ? "'" + text : text).replace(/"/g, '""') + '"';
 };
-export async function feedbackCsv(me) {
-  requireUser(me, ['moderator', 'admin']);
-  const rows = await all(
-    'SELECT f.id,f.created,u.name,f.rating,f.message FROM feedback f JOIN users u ON u.id=f.user_id ORDER BY f.id',
+const when = (seconds) => (seconds ? new Date(Number(seconds) * 1000).toISOString() : '');
+const yes = (flag) => (flag ? 'yes' : 'no');
+const staff = ['moderator', 'admin'];
+// Each export: who may download it, its header row, and its rows. Never add password hashes,
+// session tokens, or private message bodies here.
+const exportsByName = {
+  feedback: {
+    roles: staff,
+    header: 'id,submitted,name,rating,message',
+    rows: async () =>
+      (
+        await all(
+          'SELECT f.id,f.created,u.name,f.rating,f.message FROM feedback f JOIN users u ON u.id=f.user_id ORDER BY f.id',
+        )
+      ).map((r) => [r.id, when(r.created), r.name, r.rating, r.message]),
+  },
+  ratings: {
+    roles: staff,
+    header: 'stars,responses,percent',
+    rows: async () => {
+      const { count, average, ratings } = await feedbackSummary();
+      const percent = (n) => (count ? Math.round((n / count) * 1000) / 10 : 0) + '%';
+      return [
+        ...[5, 4, 3, 2, 1].map((n) => [n, ratings[n], percent(ratings[n])]),
+        ['average', average, count + ' total'],
+      ];
+    },
+  },
+  users: {
+    roles: ['admin'],
+    header: 'id,name,email,role,verified,suspended,joined',
+    rows: async () =>
+      (
+        await all('SELECT id,name,email,role,verified,suspended,created FROM users ORDER BY id')
+      ).map((r) => [
+        r.id,
+        r.name,
+        r.email,
+        r.role,
+        yes(r.verified),
+        yes(r.suspended),
+        when(r.created),
+      ]),
+  },
+  discussions: {
+    roles: ['admin'],
+    header: 'id,posted,author,category,status,title,votes,replies',
+    rows: async () =>
+      (
+        await all(
+          `SELECT p.id,p.created,u.name,p.category,p.status,p.title,
+            (SELECT COALESCE(SUM(value),0) FROM post_votes WHERE post_id=p.id) AS votes,
+            (SELECT count(*) FROM comments WHERE post_id=p.id AND deleted=0) AS replies
+           FROM posts p LEFT JOIN users u ON u.id=p.user_id ORDER BY p.id`,
+        )
+      ).map((r) => [
+        r.id,
+        when(r.created),
+        r.name,
+        r.category,
+        r.status,
+        r.title,
+        r.votes,
+        r.replies,
+      ]),
+  },
+  'lost-found': {
+    roles: ['admin'],
+    header: 'id,reported,reporter,kind,item,location,status,returned',
+    rows: async () =>
+      (
+        await all(
+          'SELECT l.id,l.created,u.name,l.kind,l.item,l.location,l.status,l.returned_at FROM lost_found l LEFT JOIN users u ON u.id=l.user_id ORDER BY l.id',
+        )
+      ).map((r) => [
+        r.id,
+        when(r.created),
+        r.name,
+        r.kind,
+        r.item,
+        r.location,
+        r.status,
+        when(r.returned_at),
+      ]),
+  },
+  reports: {
+    roles: ['admin'],
+    header: 'id,reported,reporter,kind,target,reason,resolved',
+    rows: async () =>
+      (
+        await all(
+          'SELECT c.id,c.created,u.name,c.kind,c.target,c.reason,c.resolved FROM content_reports c LEFT JOIN users u ON u.id=c.reporter ORDER BY c.id',
+        )
+      ).map((r) => [r.id, when(r.created), r.name, r.kind, r.target, r.reason, yes(r.resolved)]),
+  },
+  audit: {
+    roles: ['admin'],
+    header: 'id,when,staff,action,kind,target,reason',
+    rows: async () =>
+      (
+        await all(
+          'SELECT a.id,a.created,u.name,a.action,a.kind,a.target,a.reason FROM audit a LEFT JOIN users u ON u.id=a.actor ORDER BY a.id',
+        )
+      ).map((r) => [r.id, when(r.created), r.name, r.action, r.kind, r.target, r.reason]),
+  },
+};
+
+// Returns null for an unknown export so the caller can answer 404.
+export async function exportCsv(name, me) {
+  const spec = Object.hasOwn(exportsByName, name) ? exportsByName[name] : null;
+  if (!spec) return null;
+  requireUser(me, spec.roles);
+  const rows = await spec.rows();
+  return [spec.header, ...rows.map((row) => row.map((value) => cell(value ?? '')).join(','))].join(
+    '\r\n',
   );
-  return [
-    'id,submitted,name,rating,message',
-    ...rows.map((r) =>
-      [r.id, new Date(r.created * 1000).toISOString(), r.name, r.rating, r.message]
-        .map(cell)
-        .join(','),
-    ),
-  ].join('\r\n');
 }

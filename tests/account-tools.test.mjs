@@ -286,6 +286,20 @@ try {
     const csv = await call('feedback.csv', null, sessions.moderator);
     assert.match(csv.response.headers.get('content-disposition'), /attachment/);
     assert.ok(csv.data.includes('"\'=HYPERLINK(""http://x"")"'));
+    assert.ok(
+      (await call('ratings.csv', null, sessions.moderator)).data.includes('"average","3.5"'),
+    );
+  });
+
+  await test('admins export every dataset as CSV, staff only what they may see', async () => {
+    assert.equal((await call('users.csv', null, sessions.moderator)).status, 403);
+    assert.equal((await call('nothing.csv', null, sessions.admin)).status, 404);
+    const users = (await call('users.csv', null, sessions.admin)).data;
+    assert.ok(users.startsWith('id,name,email,role')); // text() drops the Excel byte-order mark
+    assert.ok(users.includes('other@example.test'));
+    assert.ok(!/\$2[aby]\$|scrypt|hash/i.test(users), 'password hashes never leave the server');
+    for (const name of ['discussions', 'lost-found', 'reports', 'audit'])
+      assert.equal((await call(name + '.csv', null, sessions.admin)).status, 200, name);
   });
 
   await test('members delete their account; personal data goes and public posts remain', async () => {
