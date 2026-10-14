@@ -628,6 +628,28 @@ button.inbox-row:hover,
     top: 4.5rem;
     right: 1rem;
   }
+  /* Dialog titles are 30px on desktop, which took a quarter of a phone screen. */
+  :root[data-theme] .dialog-heading h2 {
+    font-size: 24px;
+  }
+  :root[data-theme] #modal-description {
+    font-size: 15px;
+  }
+  /* Messages: more of the screen for the conversation, a shorter composer. */
+  :root[data-theme] .message-history {
+    max-height: 48dvh;
+  }
+  .dialog-content:has(.message-history) .field textarea {
+    height: 80px;
+    min-height: 0;
+  }
+}
+/* "Mark all as read" sat flush against the hint above it and the first notification below. */
+.notifications-panel > form {
+  margin-bottom: 12px;
+}
+.notifications-panel > form .form-actions {
+  margin-top: 10px;
 }
 /* Role and suspension controls wrap instead of overflowing the row. */
 .admin-user {
