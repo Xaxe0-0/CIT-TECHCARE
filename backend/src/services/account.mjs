@@ -11,7 +11,7 @@ import {
   sessionToken,
 } from '../middleware/auth.mjs';
 import * as v from '../validations/validation.mjs';
-import { sendMail } from './mail.mjs';
+import { sendMail, codeEmail } from './mail.mjs';
 import { discardProfileMedia } from './media.mjs';
 
 // Every account change re-checks the password and shares one per-account attempt limit.
@@ -47,8 +47,14 @@ export async function requestEmailChange(d, me, demo) {
   const code = String(randomInt(1000000)).padStart(6, '0');
   await sendMail(
     email,
-    'Confirm your new TechCare email',
-    `Your TechCare email change code is ${code}. It expires in 15 minutes. If you did not request this, ignore this email.`,
+    codeEmail({
+      subject: 'Confirm your new TechCare email',
+      heading: 'Confirm your new email',
+      intro: 'Enter this code in My Dashboard to switch your TechCare account to this address.',
+      label: 'TechCare email change code',
+      code,
+      note: 'If you did not request this, you can ignore this email.',
+    }),
     demo,
   );
   await run(

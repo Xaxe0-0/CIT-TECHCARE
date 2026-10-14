@@ -164,6 +164,7 @@ export function Form({
   className = '',
   submitDisabled = false,
   publishing = false,
+  cancel,
 }: {
   children: ReactNode;
   submit: string;
@@ -172,6 +173,8 @@ export function Form({
   className?: string;
   submitDisabled?: boolean;
   publishing?: boolean;
+  // Shown beside the submit button, so paired actions never stack against each other.
+  cancel?: { label: string; onClick: () => void };
 }) {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState('');
@@ -290,6 +293,11 @@ export function Form({
             >
               {busy ? 'Please wait…' : submit}
             </button>
+            {cancel && (
+              <button className="button secondary" type="button" onClick={cancel.onClick}>
+                {cancel.label}
+              </button>
+            )}
           </div>
         </fieldset>
       </form>

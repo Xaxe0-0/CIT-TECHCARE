@@ -26,6 +26,7 @@ export function ReportContent({ kind, id }: { kind: 'post' | 'comment'; id: numb
         <div className="inline-composer">
           <Form
             submit="Send report"
+            cancel={{ label: 'Cancel', onClick: () => setOpen(false) }}
             onSubmit={async (values) => {
               const r = await api<Result>('content-reports', { ...values, kind, id });
               setOpen(false);
@@ -33,9 +34,6 @@ export function ReportContent({ kind, id }: { kind: 'post' | 'comment'; id: numb
             }}
           >
             <TextArea label="Reason for reporting" name="reason" min={5} max={500} />
-            <button className="text-button" type="button" onClick={() => setOpen(false)}>
-              Cancel
-            </button>
           </Form>
         </div>
       )}
@@ -538,16 +536,20 @@ export function Conversation({ person, close }: { person: User; close: () => voi
                   key={m.id}
                 >
                   <p>{m.body}</p>
-                  <small>{date(m.created)}</small>
-                  {m.sender !== user?.id && (
-                    <button
-                      className="icon-button"
-                      aria-label="Report this message"
-                      onClick={() => setReport(m)}
-                    >
-                      <Flag size={14} />
-                    </button>
-                  )}
+                  <div className="message-meta">
+                    <small>{date(m.created)}</small>
+                    {m.sender !== user?.id && (
+                      <button
+                        className="message-report"
+                        type="button"
+                        aria-label="Report this message"
+                        title="Report this message"
+                        onClick={() => setReport(m)}
+                      >
+                        <Flag size={14} />
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))
             ) : (
@@ -573,27 +575,30 @@ export function Conversation({ person, close }: { person: User; close: () => voi
           </Form>
         </>
       )}
-      <button
-        className="text-button danger"
-        onClick={async () => {
-          try {
-            await api('block', { user_id: person.id, action: 'block' });
-            refresh();
-            close();
-            notify('Member blocked. Messaging and friendship access have been revoked.');
-          } catch (e) {
-            notify((e as Error).message);
-          }
-        }}
-      >
-        <Prohibit size={16} /> Block member
-      </button>
+      <div className="conversation-footer">
+        <button
+          className="text-button danger"
+          onClick={async () => {
+            try {
+              await api('block', { user_id: person.id, action: 'block' });
+              refresh();
+              close();
+              notify('Member blocked. Messaging and friendship access have been revoked.');
+            } catch (e) {
+              notify((e as Error).message);
+            }
+          }}
+        >
+          <Prohibit size={16} /> Block member
+        </button>
+      </div>
       {report && (
         <div className="report-form">
           <h3>Report this message</h3>
           <p>Staff will see only the reported message and your reason.</p>
           <Form
             submit="Send report"
+            cancel={{ label: 'Cancel', onClick: () => setReport(null) }}
             onSubmit={async (values) => {
               const r = await api<Result>('message-report', { ...values, message_id: report.id });
               setReport(null);
@@ -602,9 +607,6 @@ export function Conversation({ person, close }: { person: User; close: () => voi
           >
             <TextArea label="Reason for reporting" name="reason" min={10} max={500} />
           </Form>
-          <button className="text-button" onClick={() => setReport(null)}>
-            Cancel report
-          </button>
         </div>
       )}
     </Modal>

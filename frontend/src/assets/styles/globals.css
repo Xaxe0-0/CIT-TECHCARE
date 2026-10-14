@@ -1,7 +1,7 @@
 :root {
   /* Airbnb-inspired DESIGN.md, adapted to TechCare blue and the existing layout. */
-  --blue: #0066cc;
-  --blue-dark: #0052a3;
+  --blue: #0a68fc;
+  --blue-dark: #0852c9;
   --blue-focus: #0071e3;
   --blue-on-dark: #2997ff;
   --blue-light: #edf5ff;
@@ -17,7 +17,7 @@
   --dark-tile: #272729;
   --on-dark: #ffffff;
   --muted-on-dark: #cccccc;
-  --gold: #0066cc;
+  --gold: #0a68fc;
   --radius: 14px;
   --radius-large: 20px;
   --radius-utility: 8px;
@@ -3953,12 +3953,12 @@ body {
     .nav-item.active .nav-icon,
     .skip-link
   ) {
-  background: #0866c9;
-  border-color: #0866c9;
+  background: #0a68fc;
+  border-color: #0a68fc;
   color: white;
 }
 :root[data-theme='dark'] :is(.button.primary, .booth-button, .assistant-launcher):hover {
-  background: #075bb4;
+  background: #0852c9;
 }
 :root[data-theme='dark'] .button.primary:disabled {
   background: var(--blue-disabled);

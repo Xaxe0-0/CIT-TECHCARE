@@ -82,10 +82,10 @@
     .discussion-sort button.active,
     .featured-topics button[aria-pressed='true']
   ) {
-  --control-bg: #0066cc;
-  --control-hover: #0052a3;
+  --control-bg: #0a68fc;
+  --control-hover: #0852c9;
   --control-ink: #fff;
-  --control-border: #0052a3;
+  --control-border: #0852c9;
 }
 
 :root[data-theme] :is(.button.danger, .text-button.danger) {

@@ -19,7 +19,8 @@
     "test:content": "npm run build && node scripts/content-management-check.mjs",
     "test:discussion": "npm run build && node scripts/discussion-check.mjs",
     "test:assistant": "node scripts/assistant-check.mjs",
-    "setup:database": "node scripts/setup-database.mjs"
+    "setup:database": "node scripts/setup-database.mjs",
+    "test:email": "node scripts/send-test-email.mjs"
   },
   "engines": {
     "node": ">=24.0.0"

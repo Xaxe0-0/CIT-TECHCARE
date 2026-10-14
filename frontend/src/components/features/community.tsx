@@ -75,7 +75,7 @@ export function Members() {
               <div className="member-heading">
                 <Avatar user={u} large />
                 {u.role !== 'member' && (
-                  <Badge>{u.role === 'admin' ? 'Administrator' : 'Moderator'}</Badge>
+                  <Badge tone="brand">{u.role === 'admin' ? 'Administrator' : 'Moderator'}</Badge>
                 )}
               </div>
               <h2>{u.name}</h2>
@@ -93,6 +93,7 @@ export function Members() {
                   <button
                     disabled={busy === u.id}
                     className="button secondary small"
+                    aria-pressed={!!u.following}
                     onClick={() => action('follow', u)}
                   >
                     {u.following ? 'Unfollow' : 'Follow'}
@@ -101,7 +102,8 @@ export function Members() {
                     <>
                       <button
                         disabled={busy === u.id}
-                        className="button secondary small"
+                        // Inviting actions are primary; pending or undo actions stay secondary.
+                        className={`button small ${['none', 'incoming'].includes(u.friendship || 'none') ? 'primary' : 'secondary'}`}
                         onClick={() =>
                           action(
                             'friend',
@@ -126,14 +128,17 @@ export function Members() {
                       </button>
                       {u.friendship === 'incoming' && (
                         <button
-                          className="text-button"
+                          className="button secondary small"
                           onClick={() => action('friend', u, 'remove')}
                         >
                           Decline
                         </button>
                       )}
                       {u.friendship === 'friends' && (
-                        <button className="button primary small" onClick={() => setConversation(u)}>
+                        <button
+                          className="button primary small member-message"
+                          onClick={() => setConversation(u)}
+                        >
                           <ChatCircleDots size={16} />
                           Message
                         </button>
@@ -142,7 +147,7 @@ export function Members() {
                   )}
                   <button
                     disabled={busy === u.id}
-                    className="text-button subtle"
+                    className="member-block"
                     onClick={() => action('block', u, u.blocked ? 'unblock' : 'block')}
                   >
                     {u.blocked ? 'Unblock' : 'Block'}
