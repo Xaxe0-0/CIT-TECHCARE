@@ -384,7 +384,10 @@ try {
           .status,
         400,
       );
-      assert.equal((await call(a, 'queue')).data.feedback.length, 1);
+      // A quick star rating needs no comment, but a comment that is given must say something.
+      assert.equal((await call(b, 'feedback', { rating: 4 })).status, 201);
+      assert.equal((await call(b, 'feedback', { rating: 4, message: 'ok' })).status, 400);
+      assert.equal((await call(a, 'queue')).data.feedback.length, 2);
       assert.equal((await call(c, 'queue')).status, 403);
     });
     await t.test(

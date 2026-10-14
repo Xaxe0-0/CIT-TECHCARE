@@ -883,7 +883,7 @@ async function post(path, d, me, request) {
       'INSERT INTO feedback(user_id,rating,message,created) VALUES(?,?,?,?)',
       me.id,
       rating,
-      v.text(d.message, 'Feedback', 10, 1000),
+      d.message ? v.text(d.message, 'Feedback', 10, 1000) : '',
       time,
     );
     return json(
