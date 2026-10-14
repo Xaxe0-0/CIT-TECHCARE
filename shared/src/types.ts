@@ -10,6 +10,7 @@ export type User = {
   following?: boolean;
   blocked?: boolean;
   verified?: number;
+  suspended?: number;
 };
 export type Announcement = {
   id: number;
@@ -37,6 +38,7 @@ export type Post = Partial<VoteState> & {
   created: number;
   replies: number;
   lastActivity?: number;
+  review_note?: string;
 };
 export type Reply = Partial<VoteState> & {
   photo?: string;
@@ -89,9 +91,26 @@ export type Queue = {
   comments: (Reply & { title: string })[];
   reports: Notice[];
   feedback: { id: number; name: string; rating: number; message: string }[];
+  feedbackSummary: { count: number; average: number; ratings: Record<number, number> };
   messageReports: { id: number; name: string; body: string; reason: string }[];
 };
-export type Dashboard = { following: User[]; followers: User[]; posts: Post[]; hasMore: boolean };
+export type OwnReport = {
+  id: number;
+  kind: string;
+  item: string;
+  status: string;
+  review_note: string;
+  returned: number;
+  claim_note: string;
+  created: number;
+};
+export type Dashboard = {
+  following: User[];
+  followers: User[];
+  posts: Post[];
+  reports: OwnReport[];
+  hasMore: boolean;
+};
 export type FormValues = Record<string, string>;
 export type Result = {
   message?: string;

@@ -1,5 +1,16 @@
 # TechCare setup — Windows
 
+## Quick start (launcher)
+
+Install **Node.js 24 or later** and start your MySQL or MariaDB server (for XAMPP, start MySQL in the XAMPP Control Panel). Then, in the project folder, double-click **`setup.bat`** (Windows) or run **`./setup.sh`** (macOS/Linux):
+
+- **1 — Start TechCare** (the default; press Enter). Starts Ollama if it is installed, then the app at `http://127.0.0.1:3000`.
+- **2 — Set up everything.** Installs dependencies, creates `.env.local`, creates or upgrades the database, installs Ollama if it is missing (winget on Windows, the official script on Linux, Homebrew on macOS), downloads the assistant's AI models (about 2 GB the first time), and offers to create an administrator.
+
+You can pass the choice directly, for example `setup.bat 2` or `./setup.sh 1`. `npm run setup:database` runs only the database step. The manual steps below do the same work by hand.
+
+## Manual setup
+
 1. [Download TechCare](https://github.com/Vernsmoke/TechCare/archive/refs/heads/main.zip) and extract the ZIP, or clone the repository. If the repository is private, sign in with an account that has access.
 2. Install **Node.js 24 or later** from [nodejs.org](https://nodejs.org/).
 3. Install and start a local MySQL or MariaDB server. Create an empty `techcare` database and a dedicated application user with a password.
@@ -11,7 +22,7 @@
    npm run setup
    ```
 
-6. Set `TECHCARE_DB_HOST`, `TECHCARE_DB_PORT`, `TECHCARE_DB_NAME`, `TECHCARE_DB_USER`, and `TECHCARE_DB_SSL=0` in the root `.env.local` for local development. Leave `TECHCARE_DB_PASSWORD=` blank if your MySQL account has no password; otherwise set its password. Apply `backend/schema/mysql.sql` to the selected database. Keep any database password private.
+6. Set `TECHCARE_DB_HOST`, `TECHCARE_DB_PORT`, `TECHCARE_DB_NAME`, `TECHCARE_DB_USER`, and `TECHCARE_DB_SSL=0` in the root `.env.local` for local development. Leave `TECHCARE_DB_PASSWORD=` blank if your MySQL account has no password; otherwise set its password. Apply `backend/schema/mysql.sql` to the selected database. An existing database instead needs each newer `backend/schema/mysql-upgrade-*.sql` file applied once, in order (version 7 → `mysql-upgrade-8.sql` → `mysql-upgrade-9.sql`); `npm run check:setup` reports the version it expects. Keep any database password private.
 
    ```powershell
    npm run create-admin

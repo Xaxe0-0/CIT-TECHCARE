@@ -9,7 +9,20 @@ export type GuideReply = {
   link?: { href: string; label: string };
   topic?: string;
   steps?: string[];
+  // Built-in help has no answer; the page may ask the local AI instead.
+  fallback?: boolean;
+  source?: 'verified' | 'generated';
+  pending?: boolean;
 };
+
+// Help topics describe TechCare itself. A question about a device or another service that does
+// not mention a TechCare feature skips them (and the follow-up shortcut) so the AI can answer.
+const deviceOrService =
+  /\b(gmail|google|facebook|messenger|instagram|tiktok|youtube|microsoft|outlook|windows|apple|icloud|yahoo|zoom|teams|canvas|portal|laptop|computer|pc|phone|cellphone|tablet|ipad|iphone|android|mac|wi ?fi|wifi|internet|router|bluetooth|printer|scanner|monitor|screen|keyboard|mouse|speakers?|sound|audio|mic|microphone|camera|webcam|headphones|earbuds|battery|charger|usb|hdmi|projector|virus|malware|chrome|browser|excel|powerpoint|storage|fan|screenshot)\b/;
+const techcareFeature =
+  /\b(techcare|question|questions|post|posts|comment|comments|reply|replies|profile|dashboard|friend|friends|member|members|discussion|booth|moderator|feedback|lost and found)\b/;
+const isDeviceQuestion = (text: string) =>
+  deviceOrService.test(text) && !techcareFeature.test(text);
 
 const topics = [
   {
@@ -79,6 +92,7 @@ export function getGuideReply(
     return { text: 'Which part of TechCare would you like help with?', choices: helpSuggestions };
   }
   if (
+    !isDeviceQuestion(text) &&
     /\b(still|didn t|doesn t|did not|does not|not)\b.*\b(work|working|help|helped|fixed|solved)\b|no luck/.test(
       text,
     )
@@ -108,11 +122,14 @@ export function getGuideReply(
       text: 'I found a few possible guides. Which problem would you like to check first?',
       choices: matches.map((guide) => guide.title),
     };
-  const topic = helpTopics.find((item) => item.matches.some((pattern) => pattern.test(text)));
+  const topic = isDeviceQuestion(text)
+    ? undefined
+    : helpTopics.find((item) => item.matches.some((pattern) => pattern.test(text)));
   if (topic) return topicReply(topic);
   return {
     text: 'I don’t have a reliable answer for that in TechCare’s help content yet. I can explain the app’s features or share device guides. Try one of these questions, rephrase with a feature name, or ask the community for help.',
     choices: helpSuggestions,
     link: { href: '/discussion', label: 'Browse community discussions' },
+    fallback: true,
   };
 }

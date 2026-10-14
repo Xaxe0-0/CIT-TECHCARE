@@ -1,6 +1,12 @@
 # TechCare assistant handoff
 
-The built-in help widget uses local project content. There is no OpenAI SDK, AI endpoint, or personal ChatGPT connection in the application. No AI API credentials are required.
+The help widget answers TechCare questions from local project content first. Questions it cannot answer go to `POST /api/assistant`, which uses a local [Ollama](https://ollama.com) server (no OpenAI SDK, cloud AI, or API credentials):
+
+1. A question with no technology words is declined immediately (the page links to Discussion).
+2. Keywords in `backend/src/services/tech-fixes.mjs` propose verified fixes; the `nomic-embed-text` embedding model checks the best one is about the same problem. A match is returned word for word, so its steps and menu paths stay correct.
+3. Otherwise the chat model (`qwen2.5:3b` by default) streams an answer under strict rules, or replies `ESCALATE`, which the page shows as a link to Discussion. Each question is answered on its own, without earlier turns.
+
+Configure it with `TECHCARE_ASSISTANT_AI`, `TECHCARE_OLLAMA_URL`, `TECHCARE_OLLAMA_MODEL`, `TECHCARE_OLLAMA_EMBED_MODEL`, and `TECHCARE_ASSISTANT_MAX_TOKENS` (see `.env.example`). After editing the verified fixes or changing models, run `npm run test:assistant` with Ollama running. `qwen2.5:3b` uses the Qwen research licence (non-commercial); choose an Apache-2.0 model for commercial use.
 
 ## How answers work
 
@@ -20,7 +26,7 @@ Booth answers intentionally link to the current page instead of duplicating date
 
 ## Privacy and operation
 
-Chat messages are kept only in React memory, capped at 41 displayed messages. Clear chat, a page refresh, or an account change clears the conversation. Closing/reopening retains it within the same page session. There is no chat API, browser-storage persistence, AI request, or chat transcript logging. Page navigation and other site actions still use the normal TechCare backend.
+Chat messages are kept only in React memory, capped at 41 displayed messages. Clear chat, a page refresh, or an account change clears the conversation. Closing/reopening retains it within the same page session. There is no browser-storage persistence or chat transcript logging; AI questions are sent to the TechCare server and its local Ollama only, and are not stored. Page navigation and other site actions still use the normal TechCare backend.
 
 There are no AI usage fees for this implementation. Ordinary hosting, email delivery, and other project operating costs are separate. Keep `.env.local`, databases, uploaded private media, and generated build folders out of a source handoff; use `.env.example` and have the receiving team supply its own operational configuration.
 

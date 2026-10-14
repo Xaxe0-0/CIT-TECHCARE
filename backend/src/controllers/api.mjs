@@ -2,10 +2,22 @@ import {
   listComments,
   saveComment,
   saveLost,
+  deleteLost,
+  savePost,
+  deletePost,
   communityGet,
   communityPost,
   notifyReply,
+  alert,
+  LOST_FOUND_DAYS,
 } from '../services/community-content.mjs';
+import {
+  changePassword,
+  requestEmailChange,
+  confirmEmailChange,
+  deleteAccount,
+} from '../services/account.mjs';
+import { setSuspended, auditLog, feedbackSummary, feedbackCsv } from '../services/admin-tools.mjs';
 import { randomInt } from 'node:crypto';
 import { CONSENT_COOKIE, CONSENT_VERSION, hasConsent } from '../../../shared/src/consent.mjs';
 import { all, one, run, now, transaction } from '../config/db.mjs';
@@ -27,15 +39,11 @@ import {
   issueJWT,
   demoMode,
   assertConfig,
+  sessionToken,
 } from '../middleware/auth.mjs';
 import * as v from '../validations/validation.mjs';
-import { sendMail } from '../services/mail.mjs';
-import {
-  readMedia,
-  saveMedia,
-  discardQuestionMedia,
-  discardProfileMedia,
-} from '../services/media.mjs';
+import { sendMail, codeEmail } from '../services/mail.mjs';
+import { readMedia, saveMedia, discardProfileMedia } from '../services/media.mjs';
 import sharp from 'sharp';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -43,6 +51,7 @@ import { announcements, changeAnnouncement } from '../services/announcements.mjs
 import { voteColumns, changeVote } from '../services/discussion.mjs';
 import { managedContent, changeManagedContent } from '../services/managed-content.mjs';
 import { isRealtimeAvailable, publishRealtime } from '../services/realtime.mjs';
+import { assistantEnabled, streamAnswer } from '../services/assistant.mjs';
 
 const json = (payload, status = 200, headers = {}) =>
   Response.json(payload, { status, headers: { 'Cache-Control': 'no-store', ...headers } });
@@ -148,8 +157,19 @@ export async function handle(request) {
       );
     const d = await body(request, limit);
     const response = await post(path, d, me, request);
-    if (response.ok) {
-      const type = ['login', 'logout', 'reset-password', 'profile', 'admin/role'].includes(path)
+    // Assistant chats change nothing shared, so other tabs need no refresh.
+    if (response.ok && path !== 'assistant') {
+      const type = [
+        'login',
+        'logout',
+        'reset-password',
+        'profile',
+        'admin/role',
+        'admin/suspend',
+        'account/password',
+        'account/email/verify',
+        'account/delete',
+      ].includes(path)
         ? 'session'
         : ['admin/logo', 'admin/hero'].includes(path)
           ? 'settings'
@@ -179,7 +199,7 @@ export async function handle(request) {
 }
 
 async function get(path, url, me, request) {
-  if (['notifications', 'content-reports', 'item-inquiries'].includes(path))
+  if (['notifications', 'content-reports', 'item-inquiries', 'my-content'].includes(path))
     return json(await communityGet(path, url, me));
   if (['guides', 'booths'].includes(path)) return json({ [path]: await managedContent(path) });
   if (['admin/guides', 'admin/resources', 'admin/booths'].includes(path)) {
@@ -200,6 +220,7 @@ async function get(path, url, me, request) {
         '/static/techcare-hero.webp',
       classroom: demoMode(request),
       videoUploads: Boolean(process.env.TECHCARE_FFPROBE),
+      assistantAI: assistantEnabled(),
       logo: (await one("SELECT value FROM settings WHERE key='logo'"))?.value || '',
       realtime: isRealtimeAvailable(),
     });
@@ -266,11 +287,15 @@ async function get(path, url, me, request) {
     return json({
       ...paginated(
         await all(
-          `SELECT id,title,status,category,created,photo FROM posts WHERE user_id=? ORDER BY created DESC,id DESC LIMIT 21 OFFSET ${page.offset}`,
+          `SELECT id,title,status,category,created,photo,review_note FROM posts WHERE user_id=? ORDER BY created DESC,id DESC LIMIT 21 OFFSET ${page.offset}`,
           me.id,
         ),
         'posts',
         page,
+      ),
+      reports: await all(
+        'SELECT id,kind,item,status,review_note,returned,claim_note,created FROM lost_found WHERE user_id=? ORDER BY created DESC,id DESC LIMIT 50',
+        me.id,
       ),
       following,
       followers,
@@ -281,7 +306,7 @@ async function get(path, url, me, request) {
     const members = await Promise.all(
       (
         await all(
-          `SELECT * FROM users WHERE verified=1 AND name LIKE ? ORDER BY name,id LIMIT 21 OFFSET ${page.offset}`,
+          `SELECT * FROM users WHERE verified=1 AND suspended=0 AND name LIKE ? ORDER BY name,id LIMIT 21 OFFSET ${page.offset}`,
           `%${q}%`,
         )
       ).map((u) => member(u, me)),
@@ -335,7 +360,59 @@ async function get(path, url, me, request) {
       me.id,
       before,
     );
+    // Opening the latest page of a conversation reads it; idempotent and limited to own messages.
+    if (!url.searchParams.get('before'))
+      await run(
+        'UPDATE messages SET seen=1 WHERE sender=? AND receiver=? AND seen=0',
+        other,
+        me.id,
+      );
     return json({ messages: rows.slice(0, 100).reverse(), hasMore: rows.length > 100 });
+  }
+  if (path === 'inbox') {
+    requireUser(me);
+    const pending = async (sql) => Promise.all((await all(sql, me.id)).map((u) => member(u, me)));
+    const friends = await all(
+      `SELECT u.id,u.name,u.role,u.avatar,
+      (SELECT max(m.id) FROM messages m WHERE (m.sender=u.id AND m.receiver=?) OR (m.sender=? AND m.receiver=u.id)) AS lastId,
+      (SELECT count(*) FROM messages m WHERE m.sender=u.id AND m.receiver=? AND m.seen=0) AS unread
+      FROM friendships f JOIN users u ON u.id=CASE WHEN f.sender=? THEN f.receiver ELSE f.sender END
+      WHERE f.status='accepted' AND (f.sender=? OR f.receiver=?) LIMIT 500`,
+      ...Array(6).fill(me.id),
+    );
+    const ids = friends.map((f) => f.lastId).filter(Boolean);
+    const last = new Map(
+      (ids.length
+        ? await all(
+            `SELECT id,sender,body,created FROM messages WHERE id IN (${ids.map(() => '?').join(',')})`,
+            ...ids,
+          )
+        : []
+      ).map((m) => [m.id, m]),
+    );
+    const conversations = friends
+      .map(({ lastId, ...friend }) => {
+        const m = last.get(lastId);
+        return {
+          ...friend,
+          last: m
+            ? { body: m.body.slice(0, 80), created: m.created, mine: m.sender === me.id }
+            : null,
+        };
+      })
+      .sort(
+        (a, b) => (b.last?.created || 0) - (a.last?.created || 0) || a.name.localeCompare(b.name),
+      );
+    return json({
+      requests: await pending(
+        "SELECT u.* FROM friendships f JOIN users u ON u.id=f.sender WHERE f.receiver=? AND f.status='pending' ORDER BY f.created DESC LIMIT 100",
+      ),
+      sent: await pending(
+        "SELECT u.* FROM friendships f JOIN users u ON u.id=f.receiver WHERE f.sender=? AND f.status='pending' ORDER BY f.created DESC LIMIT 100",
+      ),
+      conversations,
+      unread: conversations.reduce((total, c) => total + c.unread, 0),
+    });
   }
   if (path === 'resources')
     return json(
@@ -351,13 +428,24 @@ async function get(path, url, me, request) {
     );
   if (path === 'lost-found') {
     const filter = url.searchParams.get('kind') || '';
-    if (filter) v.choice(filter, ['lost', 'found', 'returned'], 'notice filter');
+    if (filter) v.choice(filter, ['lost', 'found', 'returned', 'archived'], 'notice filter');
+    // Unreturned notices past their active window are listed only under Archived.
+    const cutoff = now() - LOST_FOUND_DAYS * 86400;
     const rows = await all(
-      `SELECT id,kind,item,details,location,created,photos,event_date,returned,user_id=? AS own FROM lost_found WHERE status='published' AND (?='' OR (?='returned' AND returned=1) OR (kind=? AND returned=0)) ORDER BY created DESC,id DESC LIMIT 21 OFFSET ${page.offset}`,
+      `SELECT id,kind,item,details,location,created,photos,event_date,returned,user_id=? AS own FROM lost_found WHERE status='published' AND (
+        (?='' AND (returned=1 OR created>?))
+        OR (?='returned' AND returned=1)
+        OR (?='archived' AND returned=0 AND created<=?)
+        OR (kind=? AND returned=0 AND created>?)
+      ) ORDER BY created DESC,id DESC LIMIT 21 OFFSET ${page.offset}`,
       me?.id || 0,
       filter,
+      cutoff,
       filter,
       filter,
+      cutoff,
+      filter,
+      cutoff,
     );
     return json(
       paginated(
@@ -382,6 +470,7 @@ async function get(path, url, me, request) {
       feedback: await all(
         'SELECT f.*,u.name FROM feedback f JOIN users u ON u.id=f.user_id ORDER BY f.created DESC LIMIT 100',
       ),
+      feedbackSummary: await feedbackSummary(),
       messageReports: await all(
         'SELECT r.id,r.reason,r.created,r.reporter,m.body,m.sender,m.receiver,u.name FROM message_reports r JOIN messages m ON m.id=r.message_id JOIN users u ON u.id=r.reporter ORDER BY r.created DESC LIMIT 100',
       ),
@@ -393,15 +482,25 @@ async function get(path, url, me, request) {
     const pattern = '%' + query.replace(/[!%_]/g, (character) => '!' + character) + '%';
     const rows = query
       ? await all(
-          `SELECT id,name,email,role,verified FROM users WHERE name LIKE ? ESCAPE '!' OR email LIKE ? ESCAPE '!' ORDER BY name COLLATE NOCASE,id LIMIT 21 OFFSET ${page.offset}`,
+          `SELECT id,name,email,role,verified,suspended FROM users WHERE name LIKE ? ESCAPE '!' OR email LIKE ? ESCAPE '!' ORDER BY name COLLATE NOCASE,id LIMIT 21 OFFSET ${page.offset}`,
           pattern,
           pattern,
         )
       : await all(
-          `SELECT id,name,email,role,verified FROM users WHERE role IN ('admin','moderator') ORDER BY role,name COLLATE NOCASE,id LIMIT 21 OFFSET ${page.offset}`,
+          `SELECT id,name,email,role,verified,suspended FROM users WHERE role IN ('admin','moderator') ORDER BY role,name COLLATE NOCASE,id LIMIT 21 OFFSET ${page.offset}`,
         );
     return json(paginated(rows, 'users', page));
   }
+  if (path === 'admin/audit') return json(await auditLog(url, me));
+  if (path === 'feedback.csv')
+    return new Response(await feedbackCsv(me), {
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="techcare-feedback.csv"',
+        'Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff',
+      },
+    });
   throw new Problem('Endpoint not found.', 404);
 }
 
@@ -413,6 +512,17 @@ async function post(path, d, me, request) {
       process.env.TECHCARE_SECURE_COOKIES === '1' || new URL(request.url).protocol === 'https:';
     return json({ accepted: true }, 200, {
       'Set-Cookie': `${CONSENT_COOKIE}=${CONSENT_VERSION}; Path=/; HttpOnly; SameSite=Lax${secure ? '; Secure' : ''}`,
+    });
+  }
+  if (path === 'assistant') {
+    const answer = await streamAnswer(d, me, request.signal);
+    return new Response(answer.stream, {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff',
+        'X-TechCare-Answer': answer.source,
+      },
     });
   }
   if (['admin/guides', 'admin/resources', 'admin/booths'].includes(path))
@@ -451,8 +561,14 @@ async function post(path, d, me, request) {
     const code = String(randomInt(1000000)).padStart(6, '0');
     await sendMail(
       email,
-      'Verify your TechCare account',
-      `Your TechCare verification code is ${code}. It expires in 15 minutes. If you did not register, ignore this email.`,
+      codeEmail({
+        subject: 'Verify your TechCare account',
+        heading: 'Verify your email',
+        intro: 'Welcome to TechCare! Enter this code to finish creating your account.',
+        label: 'TechCare verification code',
+        code,
+        note: 'If you did not register, you can ignore this email.',
+      }),
       demo,
     );
     const hash = passwordHash(password),
@@ -515,8 +631,15 @@ async function post(path, d, me, request) {
       code = String(randomInt(1000000)).padStart(6, '0');
       await sendMail(
         email,
-        'Your new TechCare verification code',
-        `Your code is ${code}. It expires in 15 minutes.`,
+        codeEmail({
+          subject: 'Your new TechCare verification code',
+          heading: 'Your new code',
+          intro:
+            'Here is a fresh code to verify your TechCare account. Earlier codes no longer work.',
+          label: 'TechCare verification code',
+          code,
+          note: 'If you did not request this, you can ignore this email.',
+        }),
         demo,
       );
       await run(
@@ -543,13 +666,15 @@ async function post(path, d, me, request) {
     )
       throw new Problem('Invalid email or password.', 401);
     if (!u.verified) throw new Problem('Verify your email before signing in.', 403);
+    if (u.suspended)
+      throw new Problem('This account is suspended. Contact the project team for help.', 403);
     const token = issueJWT(u.id, time);
     await run('DELETE FROM sessions WHERE expires<=?', time);
     await run('INSERT INTO sessions VALUES(?,?,?)', digest(token), u.id, time + 604800);
     return json({ user: ownUser(u) }, 200, { 'Set-Cookie': cookie(token) });
   }
   if (path === 'logout') {
-    const token = request.headers.get('cookie')?.match(/(?:^|;\s*)techcare=([^;]+)/)?.[1];
+    const token = sessionToken(request);
     if (token) await run('DELETE FROM sessions WHERE token_hash=?', digest(token));
     return json({ ok: true }, 200, { 'Set-Cookie': cookie('', true) });
   }
@@ -562,8 +687,15 @@ async function post(path, d, me, request) {
       try {
         await sendMail(
           email,
-          'Reset your TechCare password',
-          `Open TechCare, choose Sign In, then Reset password with a token. Your single-use reset token is ${token}. It expires in 15 minutes. If you did not request this, ignore this email.`,
+          codeEmail({
+            subject: 'Reset your TechCare password',
+            heading: 'Reset your password',
+            intro:
+              'Open TechCare, choose Sign In, then Reset password with a token, and paste this single-use token.',
+            label: 'Password reset token',
+            code: token,
+            note: 'If you did not request this, you can ignore this email; your password stays the same.',
+          }),
           demo,
         );
         await transaction(async () => {
@@ -648,13 +780,17 @@ async function post(path, d, me, request) {
           target,
           time,
         );
-      else if (action === 'accept' && state === 'incoming')
+      else if (action === 'accept' && state === 'incoming') {
         await run(
           "UPDATE friendships SET status='accepted' WHERE sender=? AND receiver=? AND status='pending'",
           target,
           me.id,
         );
-      else if (action === 'remove' && state !== 'none')
+        await alert(
+          target,
+          `${me.name} accepted your friend request. You can now message each other.`,
+        );
+      } else if (action === 'remove' && state !== 'none')
         await run(
           'DELETE FROM friendships WHERE (sender=? AND receiver=?) OR (sender=? AND receiver=?)',
           me.id,
@@ -730,35 +866,15 @@ async function post(path, d, me, request) {
       201,
     );
   }
-  if (path === 'posts') {
-    const title = v.text(d.title, 'Question title', 8, 120),
-      body = v.text(d.body, 'Problem description', 20, 2000),
-      category = v.choice(d.category, v.categories, 'category');
-    const photo = d.photo ? await saveMedia(d.photo, me.id, 'question') : '';
-    let r;
-    try {
-      r = await run(
-        'INSERT INTO posts(user_id,title,body,category,created,photo) VALUES(?,?,?,?,?,?)',
-        me.id,
-        title,
-        body,
-        category,
-        time,
-        photo,
-      );
-    } catch (error) {
-      if (photo) await discardQuestionMedia(photo, me.id);
-      throw error;
-    }
-    return json(
-      {
-        ok: true,
-        id: Number(r.lastInsertRowid),
-        message: 'Question submitted for moderator review. Track its status in My Dashboard.',
-      },
-      201,
-    );
-  }
+  if (path === 'posts') return json(await savePost(d, me), 201);
+  if (path === 'posts/delete') return json(await deletePost(d, me));
+  if (path === 'lost-found/delete') return json(await deleteLost(d, me));
+  if (path === 'account/password') return json(await changePassword(d, me, request));
+  if (path === 'account/email') return json(await requestEmailChange(d, me, demo));
+  if (path === 'account/email/verify') return json(await confirmEmailChange(d, me));
+  if (path === 'account/delete')
+    return json(await deleteAccount(d, me), 200, { 'Set-Cookie': cookie('', true) });
+  if (path === 'admin/suspend') return json(await setSuspended(d, me));
   if (path === 'comments') return json(await saveComment(d, me), 201);
   if (path === 'feedback') {
     const rating = v.id(d.rating);
@@ -794,7 +910,9 @@ async function post(path, d, me, request) {
       target = v.id(d.id),
       status = v.choice(d.status, ['published', 'rejected'], 'decision');
     const answer = d.answer ? v.text(d.answer, 'Answer', 3, 1000) : '',
-      reason = v.text(d.reason || '', 'Internal reason', 0, 500);
+      reason = v.text(d.reason || '', 'Internal reason', 0, 500),
+      // Shown to the author with a rejection; the internal reason stays in the audit log.
+      note = status === 'rejected' ? v.text(d.note || '', 'Note to the author', 0, 500) : '';
     if (answer && (kind !== 'post' || status !== 'published'))
       throw new Problem('An answer requires approving a question.');
     await transaction(async () => {
@@ -806,9 +924,17 @@ async function post(path, d, me, request) {
         ))
       )
         throw new Problem('The parent discussion is unavailable.', 409);
+      const submission =
+        kind === 'comment'
+          ? null
+          : await one(
+              `SELECT user_id,${kind === 'post' ? 'title' : 'item'} AS label FROM ${table} WHERE id=?`,
+              target,
+            );
       const r = await run(
-        `UPDATE ${table} SET status=? WHERE id=? AND status='pending'`,
+        `UPDATE ${table} SET status=?${submission ? ',review_note=?' : ''} WHERE id=? AND status='pending'`,
         status,
+        ...(submission ? [note] : []),
         target,
       );
       if (r.changes !== 1)
@@ -825,6 +951,23 @@ async function post(path, d, me, request) {
           time,
         );
       if (kind === 'comment' && status === 'published') await notifyReply(target);
+      if (submission && submission.user_id !== me.id) {
+        const subject =
+          kind === 'post'
+            ? `Your question “${submission.label}”`
+            : `Your Lost & Found notice “${submission.label}”`;
+        await alert(
+          submission.user_id,
+          status === 'published'
+            ? `${subject} was approved${answer ? ' and answered' : ''}.`
+            : `${subject} was not approved.${note ? ` Note from the moderator: ${note}` : ''} You can edit and resubmit it from My Dashboard.`,
+          status === 'rejected'
+            ? '/profile'
+            : kind === 'post'
+              ? `/discussion/${target}`
+              : '/lostfound',
+        );
+      }
       await audit(me, answer ? 'approve-and-answer' : status, kind, target, reason);
     });
     return json({

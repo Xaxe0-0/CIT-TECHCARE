@@ -5,7 +5,7 @@
   --ink: #15263d;
   --muted: #53647a;
   --line: #d4dfed;
-  --blue: #0066cc;
+  --blue: #0a68fc;
   --blue-light: #e9f3ff;
   --control-bg: #ffffff;
   --control-hover: #e9f3ff;
@@ -183,4 +183,19 @@
   .assistant-panel .assistant-composer {
     margin: 8px 16px;
   }
+}
+
+/* Local AI answers: keep the model's line breaks and show where each answer came from. */
+.assistant-answer {
+  white-space: pre-line;
+}
+.assistant-answer-source {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.assistant-thinking {
+  color: var(--muted);
+  font-style: italic;
 }

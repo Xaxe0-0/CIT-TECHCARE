@@ -82,10 +82,10 @@
     .discussion-sort button.active,
     .featured-topics button[aria-pressed='true']
   ) {
-  --control-bg: #0066cc;
-  --control-hover: #0052a3;
+  --control-bg: #0a68fc;
+  --control-hover: #0852c9;
   --control-ink: #fff;
-  --control-border: #0052a3;
+  --control-border: #0852c9;
 }
 
 :root[data-theme] :is(.button.danger, .text-button.danger) {
@@ -121,6 +121,55 @@
   color: var(--control-ink);
   border-color: var(--blue);
   box-shadow: 0 3px 7px rgb(14 35 58 / 20%);
+}
+
+/* The search button sits evenly inset inside its field instead of touching its edges. */
+:root[data-theme] .search-field {
+  height: 56px;
+  padding-right: 6px;
+}
+
+:root[data-theme] .search-field button {
+  padding: 0 20px;
+  border-radius: 6px;
+}
+
+/* Password fields: the show/hide toggle sits inside the input's right edge. */
+.password-field {
+  position: relative;
+  display: block;
+}
+
+:root[data-theme] .password-field input {
+  padding-right: 52px;
+}
+
+/* Edge adds its own reveal button; keep a single toggle. */
+.password-field input::-ms-reveal,
+.password-field input::-ms-clear {
+  display: none;
+}
+
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 40px;
+  padding: 0;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.password-toggle:hover {
+  color: var(--ink);
 }
 
 :root[data-theme] :is(button, .button, .action-link):focus-visible {

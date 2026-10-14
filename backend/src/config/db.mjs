@@ -79,13 +79,13 @@ export async function closeMySQLPool() {
 export async function assertDatabaseReady() {
   assertDatabaseConfig();
   try {
-    const latest = await one('SELECT version FROM migrations WHERE version=? LIMIT 1', 7);
+    const latest = await one('SELECT version FROM migrations WHERE version=? LIMIT 1', 9);
     if (!latest)
       throw new Error(
-        'MySQL schema is not at version 7. Apply backend/schema/mysql.sql before startup.',
+        'MySQL schema is not at version 9. Apply backend/schema/mysql.sql to a new database, or the backend/schema/mysql-upgrade-*.sql files above its current version, in order.',
       );
   } catch (error) {
-    if (error.message?.includes('MySQL schema is not at version 7')) throw error;
+    if (error.message?.includes('MySQL schema is not at version 9')) throw error;
     if (error.code === 'ER_NO_SUCH_TABLE')
       throw new Error('MySQL schema is missing. Apply backend/schema/mysql.sql before startup.');
     throw new Error(
@@ -155,7 +155,7 @@ export function db() {
   const cached = globalThis.__techcareDBs.get(path);
   if (cached) {
     if (migratedConnections.has(cached)) return cached;
-    if (cached.prepare('SELECT 1 FROM migrations WHERE version=7').get()) {
+    if (cached.prepare('SELECT 1 FROM migrations WHERE version=9').get()) {
       migratedConnections.add(cached);
       return cached;
     }
@@ -326,6 +326,30 @@ export function db() {
     if (!con.prepare('SELECT 1 FROM migrations WHERE version=7').get()) {
       con.exec("ALTER TABLE item_inquiries ADD COLUMN response TEXT NOT NULL DEFAULT '';");
       con.prepare('INSERT INTO migrations VALUES(7,?)').run(Math.floor(Date.now() / 1000));
+    }
+    if (!con.prepare('SELECT 1 FROM migrations WHERE version=8').get()) {
+      // Existing history counts as read so an upgrade does not flood every inbox.
+      con.exec(`
+        ALTER TABLE messages ADD COLUMN seen INTEGER NOT NULL DEFAULT 0;
+        UPDATE messages SET seen=1;
+        CREATE INDEX message_unread ON messages(receiver,seen);
+      `);
+      con.prepare('INSERT INTO migrations VALUES(8,?)').run(Math.floor(Date.now() / 1000));
+    }
+    if (!con.prepare('SELECT 1 FROM migrations WHERE version=9').get()) {
+      con.exec(`
+        ALTER TABLE posts ADD COLUMN review_note TEXT NOT NULL DEFAULT '';
+        ALTER TABLE lost_found ADD COLUMN review_note TEXT NOT NULL DEFAULT '';
+        ALTER TABLE lost_found ADD COLUMN claim_note TEXT NOT NULL DEFAULT '';
+        ALTER TABLE lost_found ADD COLUMN returned_at INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE users ADD COLUMN suspended INTEGER NOT NULL DEFAULT 0;
+        CREATE TABLE alerts(id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          text TEXT NOT NULL, link TEXT NOT NULL DEFAULT '', seen INTEGER NOT NULL DEFAULT 0, created INTEGER NOT NULL);
+        CREATE INDEX alerts_user ON alerts(user_id,id);
+        CREATE TABLE email_changes(user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+          email TEXT NOT NULL, code_hash TEXT NOT NULL, expires INTEGER NOT NULL, attempts INTEGER NOT NULL DEFAULT 0);
+      `);
+      con.prepare('INSERT INTO migrations VALUES(9,?)').run(Math.floor(Date.now() / 1000));
     }
     con.exec('COMMIT');
   } catch (error) {

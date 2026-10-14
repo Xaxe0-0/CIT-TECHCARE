@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { TechCareContext } from '@/context/techcare-context';
-import { ReplyNotifications } from '../features/community-extras';
+import { Inbox, ReplyNotifications } from '../features/community-extras';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect, useRef, type ReactNode } from 'react';
 import {
@@ -176,7 +176,9 @@ export function Shell({
     const refreshSession = () => {
       api<{ user: User | null }>('me')
         .then((result) => setUserState(result.user))
-        .catch(() => setNotice('Could not refresh your session. Your current page is still available.'));
+        .catch(() =>
+          setNotice('Could not refresh your session. Your current page is still available.'),
+        );
     };
     const refreshSettings = () => {
       api<{ hero: string; classroom: boolean; logo: string; realtime: boolean }>('settings')
@@ -493,6 +495,7 @@ export function Shell({
             <span>{title}</span>
           </div>
           <div className="topbar-actions">
+            {user && <Inbox key={`inbox-${user.id}`} />}
             {user && <ReplyNotifications key={user.id} />}
             <button
               className="icon-button theme-toggle"

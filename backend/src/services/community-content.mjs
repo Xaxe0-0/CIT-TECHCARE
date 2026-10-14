@@ -1,10 +1,101 @@
 import { all, one, run, now, transaction } from '../config/db.mjs';
 import { Problem, requireUser, blocked, throttle } from '../middleware/auth.mjs';
 import * as v from '../validations/validation.mjs';
-import { saveMedia, discardCommunityMedia } from './media.mjs';
+import { saveMedia, discardCommunityMedia, discardQuestionMedia } from './media.mjs';
 import { voteColumns } from './discussion.mjs';
 
 const staff = ['admin', 'moderator'];
+// Notices older than this leave the active lists and move to Archived.
+export const LOST_FOUND_DAYS = 90;
+// A bell notification for anything other than a comment reply.
+export async function alert(userId, text, link = '') {
+  await run(
+    'INSERT INTO alerts(user_id,text,link,created) VALUES(?,?,?,?)',
+    userId,
+    text.slice(0, 700),
+    link,
+    now(),
+  );
+}
+// Authors may edit while a submission awaits or failed review; an edit always returns it to review.
+const editable = ['pending', 'rejected'];
+async function ownSubmission(table, d, me, label) {
+  const row = await one(`SELECT * FROM ${table} WHERE id=?`, v.id(d.id));
+  if (!row || row.user_id !== me.id)
+    throw new Problem(`You can change only your own ${label}.`, 403);
+  return row;
+}
+export async function savePost(d, me) {
+  requireUser(me);
+  const editing = d.id ? await ownSubmission('posts', d, me, 'questions') : null;
+  if (editing && !editable.includes(editing.status))
+    throw new Problem(
+      'Published questions cannot be edited. Delete it, or ask a moderator for help.',
+      409,
+    );
+  const title = v.text(d.title, 'Question title', 8, 120),
+    body = v.text(d.body, 'Problem description', 20, 2000),
+    category = v.choice(d.category, v.categories, 'category');
+  const uploaded = d.photo ? await saveMedia(d.photo, me.id, 'question') : '';
+  const photo = uploaded || (d.removePhoto === '1' ? '' : editing?.photo || '');
+  let id;
+  try {
+    if (editing) {
+      const r = await run(
+        "UPDATE posts SET title=?,body=?,category=?,photo=?,status='pending',review_note='' WHERE id=? AND user_id=? AND status IN ('pending','rejected')",
+        title,
+        body,
+        category,
+        photo,
+        editing.id,
+        me.id,
+      );
+      if (!r.changes) throw new Problem('This question changed. Refresh and try again.', 409);
+      id = editing.id;
+    } else
+      id = Number(
+        (
+          await run(
+            'INSERT INTO posts(user_id,title,body,category,created,photo) VALUES(?,?,?,?,?,?)',
+            me.id,
+            title,
+            body,
+            category,
+            now(),
+            photo,
+          )
+        ).lastInsertRowid,
+      );
+  } catch (error) {
+    if (uploaded) await discardQuestionMedia(uploaded, me.id);
+    throw error;
+  }
+  if (editing?.photo && editing.photo !== photo) await discardQuestionMedia(editing.photo, me.id);
+  return {
+    ok: true,
+    id,
+    message: editing
+      ? 'Question resubmitted for moderator review.'
+      : 'Question submitted for moderator review. Track its status in My Dashboard.',
+  };
+}
+export async function deletePost(d, me) {
+  requireUser(me);
+  const post = await ownSubmission('posts', d, me, 'questions');
+  // Removing a thread would take other members' answers with it; staff handle that via reports.
+  if (await one('SELECT 1 FROM comments WHERE post_id=? AND user_id<>? LIMIT 1', post.id, me.id))
+    throw new Problem(
+      'Others have answered this question, so it stays. Report it if it should be removed.',
+      409,
+    );
+  const photos = (
+    await all("SELECT photo FROM comments WHERE post_id=? AND photo<>''", post.id)
+  ).map((row) => row.photo);
+  await run('DELETE FROM posts WHERE id=? AND user_id=?', post.id, me.id);
+  if (post.photo) await discardQuestionMedia(post.photo, me.id);
+  for (const url of photos) await discardCommunityMedia(url, me.id);
+  return { message: 'Question deleted.' };
+}
 export async function publishedComment(id) {
   return await one(
     `SELECT c.* FROM comments c JOIN posts p ON p.id=c.post_id
@@ -152,6 +243,12 @@ export async function saveComment(d, me) {
 }
 export async function saveLost(d, me) {
   requireUser(me);
+  const editing = d.id ? await ownSubmission('lost_found', d, me, 'reports') : null;
+  if (editing && !editable.includes(editing.status))
+    throw new Problem(
+      'Published notices cannot be edited. Delete it and submit a new report instead.',
+      409,
+    );
   const kind = v.choice(d.kind, ['lost', 'found'], 'report type');
   const item = v.text(d.item, 'Item name', 3, 100),
     details = v.publicDescription(d.details),
@@ -168,32 +265,67 @@ export async function saveLost(d, me) {
   try {
     for (let i = 0; i < 4; i++)
       if (d[`photo${i}`]) photos.push(await saveMedia(d[`photo${i}`], me.id, 'lost'));
-    const id = Number(
-      (
-        await run(
-          'INSERT INTO lost_found(user_id,kind,item,details,location,created,photos,event_date) VALUES(?,?,?,?,?,?,?,?)',
-          me.id,
-          kind,
-          item,
-          details,
-          location,
-          now(),
-          JSON.stringify(photos),
-          eventDate,
-        )
-      ).lastInsertRowid,
-    );
-    return { id, message: 'Your report and photos have been submitted for review.' };
+    // New photos replace the saved set; otherwise an edit keeps the existing photos.
+    const saved = JSON.stringify(photos.length ? photos : JSON.parse(editing?.photos || '[]'));
+    let id;
+    if (editing) {
+      const r = await run(
+        "UPDATE lost_found SET kind=?,item=?,details=?,location=?,photos=?,event_date=?,status='pending',review_note='' WHERE id=? AND user_id=? AND status IN ('pending','rejected')",
+        kind,
+        item,
+        details,
+        location,
+        saved,
+        eventDate,
+        editing.id,
+        me.id,
+      );
+      if (!r.changes) throw new Problem('This report changed. Refresh and try again.', 409);
+      id = editing.id;
+    } else
+      id = Number(
+        (
+          await run(
+            'INSERT INTO lost_found(user_id,kind,item,details,location,created,photos,event_date) VALUES(?,?,?,?,?,?,?,?)',
+            me.id,
+            kind,
+            item,
+            details,
+            location,
+            now(),
+            saved,
+            eventDate,
+          )
+        ).lastInsertRowid,
+      );
+    if (editing && photos.length)
+      for (const url of JSON.parse(editing.photos)) await discardCommunityMedia(url, me.id);
+    return {
+      id,
+      message: editing
+        ? 'Your report was updated and sent for review again.'
+        : 'Your report and photos have been submitted for review.',
+    };
   } catch (error) {
     for (const url of photos) await discardCommunityMedia(url, me.id);
     throw error;
   }
 }
+export async function deleteLost(d, me) {
+  requireUser(me);
+  const report = await ownSubmission('lost_found', d, me, 'reports');
+  await transaction(async () => {
+    await run('DELETE FROM item_inquiries WHERE report_id=?', report.id);
+    await run('DELETE FROM lost_found WHERE id=?', report.id);
+  });
+  for (const url of JSON.parse(report.photos)) await discardCommunityMedia(url, me.id);
+  return { message: 'Report deleted.' };
+}
 export async function communityGet(path, url, me) {
   if (path === 'notifications') {
     requireUser(me);
     const rows = await all(
-      `SELECT n.id,n.seen,c.post_id,c.id AS comment_id,c.root_id,u.name,p.title,
+      `SELECT n.id,n.seen,n.created,c.post_id,c.id AS comment_id,c.root_id,u.name,p.title,
       (SELECT count(*) FROM comments earlier WHERE earlier.post_id=c.post_id AND earlier.root_id IS NULL AND earlier.status='published' AND (earlier.created<root.created OR (earlier.created=root.created AND earlier.id<root.id))) AS preceding FROM notifications n
       JOIN comments c ON c.id=n.comment_id JOIN users u ON u.id=c.user_id JOIN posts p ON p.id=c.post_id
       LEFT JOIN comments root ON root.id=c.root_id WHERE n.user_id=? AND c.status='published' AND c.deleted=0
@@ -206,7 +338,30 @@ export async function communityGet(path, url, me) {
         ...row,
         page: 1 + Math.floor(preceding / 20),
       })),
+      alerts: await all(
+        'SELECT id,text,link,seen,created FROM alerts WHERE user_id=? ORDER BY id DESC LIMIT 50',
+        me.id,
+      ),
     };
+  }
+  if (path === 'my-content') {
+    requireUser(me);
+    const kind = v.choice(url.searchParams.get('kind'), ['post', 'report'], 'content type'),
+      id = v.id(url.searchParams.get('id'));
+    const row =
+      kind === 'post'
+        ? await one(
+            'SELECT id,title,body,category,photo,status,review_note FROM posts WHERE id=? AND user_id=?',
+            id,
+            me.id,
+          )
+        : await one(
+            'SELECT id,kind,item,details,location,event_date,photos,status,review_note FROM lost_found WHERE id=? AND user_id=?',
+            id,
+            me.id,
+          );
+    if (!row) throw new Problem('Not found among your submissions.', 404);
+    return { item: row.photos ? { ...row, photos: JSON.parse(row.photos) } : row };
   }
   if (path === 'content-reports') {
     requireUser(me, staff);
@@ -238,12 +393,17 @@ export async function communityPost(path, d, me) {
   requireUser(me);
   if (path === 'notifications') {
     await run('UPDATE notifications SET seen=1 WHERE user_id=?', me.id);
+    await run('UPDATE alerts SET seen=1 WHERE user_id=?', me.id);
     return { message: 'Notifications marked as read.' };
   }
   if (path === 'lost-found/returned') {
     const id = v.id(d.id);
+    // The private return record documents custody: who received the item and how ownership was checked.
+    const note = v.text(d.note, 'Return record', 5, 500);
     const result = await run(
-      "UPDATE lost_found SET returned=1 WHERE id=? AND status='published' AND (user_id=? OR ?=1)",
+      "UPDATE lost_found SET returned=1,claim_note=?,returned_at=? WHERE id=? AND status='published' AND returned=0 AND (user_id=? OR ?=1)",
+      note,
+      now(),
       id,
       me.id,
       staff.includes(me.role) ? 1 : 0,
@@ -268,11 +428,17 @@ export async function communityPost(path, d, me) {
       body,
       now(),
     );
+    if (report.user_id !== me.id)
+      await alert(
+        report.user_id,
+        `Someone sent a private message about your notice “${report.item}”.`,
+        '/lostfound',
+      );
     return { message: 'Message sent privately to the reporter and project team.' };
   }
   if (path === 'item-inquiries/reply') {
     const inquiry = await one(
-      'SELECT i.id,i.user_id,l.user_id AS owner FROM item_inquiries i JOIN lost_found l ON l.id=i.report_id WHERE i.id=?',
+      'SELECT i.id,i.user_id,l.user_id AS owner,l.item FROM item_inquiries i JOIN lost_found l ON l.id=i.report_id WHERE i.id=?',
       v.id(d.id),
     );
     if (
@@ -286,6 +452,12 @@ export async function communityPost(path, d, me) {
       v.text(d.response, 'Reply', 3, 1000),
       inquiry.id,
     );
+    if (inquiry.user_id !== me.id)
+      await alert(
+        inquiry.user_id,
+        `You have a reply about the notice “${inquiry.item}”.`,
+        '/lostfound',
+      );
     return { message: 'Private reply saved.' };
   }
   if (path === 'content-reports') {

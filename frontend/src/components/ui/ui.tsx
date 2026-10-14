@@ -19,6 +19,8 @@ import {
   ChatCircleDots,
   ImageSquare,
   VideoCamera,
+  Eye,
+  EyeSlash,
 } from '@phosphor-icons/react';
 import type { FormValues, User } from '@shared/types';
 
@@ -94,8 +96,9 @@ type Control = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
 function inputError(input: Control) {
   if (input.disabled || !input.willValidate) return '';
   const label = input.labels?.[0]?.querySelector('span')?.textContent || input.name || 'This field';
+  // Passwords are never trimmed, including while shown as plain text.
   const value =
-    input instanceof HTMLInputElement && input.type === 'password'
+    input instanceof HTMLInputElement && input.dataset.password !== undefined
       ? input.value
       : input.value.trim();
   if (input instanceof HTMLInputElement && input.type === 'file') {
@@ -161,6 +164,7 @@ export function Form({
   className = '',
   submitDisabled = false,
   publishing = false,
+  cancel,
 }: {
   children: ReactNode;
   submit: string;
@@ -169,6 +173,8 @@ export function Form({
   className?: string;
   submitDisabled?: boolean;
   publishing?: boolean;
+  // Shown beside the submit button, so paired actions never stack against each other.
+  cancel?: { label: string; onClick: () => void };
 }) {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState('');
@@ -287,6 +293,11 @@ export function Form({
             >
               {busy ? 'Please wait…' : submit}
             </button>
+            {cancel && (
+              <button className="button secondary" type="button" onClick={cancel.onClick}>
+                {cancel.label}
+              </button>
+            )}
           </div>
         </fieldset>
       </form>
@@ -319,25 +330,49 @@ export function Field({
   inputMode?: 'text' | 'numeric' | 'email' | 'url';
 }) {
   const { error, id, errorId } = useFieldError(name);
+  const [shown, setShown] = useState(false);
+  const password = type === 'password';
+  const input = (
+    <input
+      aria-labelledby={`${id}-label`}
+      id={id}
+      aria-invalid={!!error}
+      aria-describedby={error ? errorId : undefined}
+      pattern={pattern}
+      inputMode={inputMode}
+      name={name}
+      type={password && shown ? 'text' : type}
+      data-password={password ? '' : undefined}
+      minLength={min}
+      maxLength={max}
+      required={required}
+      defaultValue={value}
+      placeholder={placeholder}
+      autoComplete={autoComplete}
+    />
+  );
   return (
     <label className="field">
       <span id={`${id}-label`}>{label}</span>
-      <input
-        aria-labelledby={`${id}-label`}
-        id={id}
-        aria-invalid={!!error}
-        aria-describedby={error ? errorId : undefined}
-        pattern={pattern}
-        inputMode={inputMode}
-        name={name}
-        type={type}
-        minLength={min}
-        maxLength={max}
-        required={required}
-        defaultValue={value}
-        placeholder={placeholder}
-        autoComplete={autoComplete}
-      />
+      {password ? (
+        <span className="password-field">
+          {input}
+          <button
+            type="button"
+            className="password-toggle"
+            aria-label={shown ? 'Hide password' : 'Show password'}
+            aria-controls={id}
+            aria-pressed={shown}
+            // Keep focus and the caret in the input when toggling with a pointer.
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => setShown(!shown)}
+          >
+            {shown ? <EyeSlash size={20} /> : <Eye size={20} />}
+          </button>
+        </span>
+      ) : (
+        input
+      )}
       <FieldError id={errorId} error={error} />
     </label>
   );

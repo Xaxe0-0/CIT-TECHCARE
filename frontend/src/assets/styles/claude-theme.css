@@ -2,10 +2,10 @@
    Georgia is the local serif fallback for the reference's licensed display fonts.
    Legacy --blue aliases keep all existing application surfaces in this palette. */
 :root {
-  --accent: #0066cc;
-  --accent-active: #0052a3;
-  --blue: #0052a3;
-  --blue-dark: #0052a3;
+  --accent: #0a68fc;
+  --accent-active: #0852c9;
+  --blue: #0852c9;
+  --blue-dark: #0852c9;
   --blue-focus: var(--accent-active);
   --blue-on-dark: #85bbff;
   --blue-light: #edf5ff;
@@ -499,7 +499,7 @@ main {
   color: #ffffff;
 }
 :root[data-theme='dark'] :is(.button.primary, .assistant-launcher):hover {
-  background: #0052a3;
+  background: #0852c9;
   color: #ffffff;
 }
 :root[data-theme='dark'] .button.booth-button,
