@@ -55,15 +55,6 @@ export function Shell({
   initialLogo: string;
 }) {
   const [theme, setTheme] = useState(initialTheme);
-  // The other theme's backdrop loads after the page, so it never competes with the first paint
-  // but is ready for the fade when the theme is switched.
-  const [otherBackdrop, setOtherBackdrop] = useState(false);
-  useEffect(() => {
-    const load = () => setOtherBackdrop(true);
-    if (document.readyState === 'complete') load();
-    else window.addEventListener('load', load, { once: true });
-    return () => window.removeEventListener('load', load);
-  }, []);
   const [authDraft, setAuthDraft] = useState(emptyAuthDraft);
   const updateAuthDraft = (values: Partial<AuthDraft>) =>
     setAuthDraft((draft) => ({ ...draft, ...values }));
@@ -408,24 +399,21 @@ export function Shell({
         Skip to content
       </a>
       <div className="campus-backdrop" aria-hidden="true">
-        {(theme !== 'dark' || otherBackdrop) && (
-          <img
-            className="campus-day"
-            src={`/static/campus/${campusScene}.webp`}
-            alt=""
-            decoding="async"
-            fetchPriority={theme === 'dark' ? 'low' : 'high'}
-          />
-        )}
-        {(theme === 'dark' || otherBackdrop) && (
-          <img
-            className="campus-night"
-            src={`/static/campus/${campusScene}-dark.webp`}
-            alt=""
-            decoding="async"
-            fetchPriority={theme === 'dark' ? 'high' : 'low'}
-          />
-        )}
+        {/* The current theme's backdrop downloads first; the other is ready for the fade. */}
+        <img
+          className="campus-day"
+          src={`/static/campus/${campusScene}.webp`}
+          alt=""
+          decoding="async"
+          fetchPriority={theme === 'dark' ? 'low' : 'high'}
+        />
+        <img
+          className="campus-night"
+          src={`/static/campus/${campusScene}-dark.webp`}
+          alt=""
+          decoding="async"
+          fetchPriority={theme === 'dark' ? 'high' : 'low'}
+        />
       </div>
       {menu && (
         <button
