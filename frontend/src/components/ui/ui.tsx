@@ -21,6 +21,7 @@ import {
   VideoCamera,
   Eye,
   EyeSlash,
+  Star,
 } from '@phosphor-icons/react';
 import type { FormValues, User } from '@shared/types';
 
@@ -566,6 +567,39 @@ export function Upload({
         </div>
       )}
     </div>
+  );
+}
+export function StarRating({
+  value,
+  onChange,
+  legend = 'Your rating',
+  size = 37,
+}: {
+  value: number;
+  onChange: (value: number) => void;
+  legend?: string;
+  size?: number;
+}) {
+  return (
+    <fieldset className="rating-field">
+      <legend>{legend}</legend>
+      <div className="rating-stars">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <label key={n} title={`${n} out of 5`}>
+            <input
+              type="radio"
+              name="rating"
+              value={n}
+              checked={value === n}
+              onChange={() => onChange(n)}
+              aria-label={`${n} out of 5`}
+            />
+            <Star size={size} weight={n <= value ? 'fill' : 'regular'} />
+          </label>
+        ))}
+        <span>{value ? `${value} / 5` : 'Choose a rating'}</span>
+      </div>
+    </fieldset>
   );
 }
 export function Avatar({

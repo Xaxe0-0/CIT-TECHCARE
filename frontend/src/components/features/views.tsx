@@ -34,6 +34,7 @@ import {
   Pagination,
   Search,
   Select,
+  StarRating,
   Success,
   TextArea,
   Upload,
@@ -343,25 +344,7 @@ function Feedback() {
               setDone(true);
             }}
           >
-            <fieldset className="rating-field">
-              <legend>Your rating</legend>
-              <div className="rating-stars">
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <label key={n} title={`${n} out of 5`}>
-                    <input
-                      type="radio"
-                      name="rating"
-                      value={n}
-                      checked={rating === n}
-                      onChange={() => setRating(n)}
-                      aria-label={`${n} out of 5`}
-                    />
-                    <Star size={37} weight={n <= rating ? 'fill' : 'regular'} />
-                  </label>
-                ))}
-                <span>{rating} / 5</span>
-              </div>
-            </fieldset>
+            <StarRating value={rating} onChange={setRating} />
             <TextArea
               label="What worked well? What could be better?"
               name="message"

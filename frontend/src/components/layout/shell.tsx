@@ -29,6 +29,7 @@ import { Avatar, Modal } from '../ui/ui';
 import { api } from '@/services/api';
 import type { User } from '@shared/types';
 import { GuideAssistant } from '../features/guide-assistant';
+import { ExitFeedback } from '../features/exit-feedback';
 import { NavigationDock } from './navigation-dock';
 import { authPaths, emptyAuthDraft, type AuthDraft, type AuthMode } from '@/utils/auth-pages';
 const navigation = [
@@ -549,6 +550,7 @@ export function Shell({
         </footer>
       </div>
       <GuideAssistant key={user?.id ?? 'guest'} onAsk={ask} />
+      {user && <ExitFeedback key={`feedback-${user.id}`} />}
       {notice && (
         <div className="toast" role="status">
           <ShieldCheck size={22} />
