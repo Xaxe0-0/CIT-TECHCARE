@@ -36,7 +36,9 @@ export function assertDatabaseConfig() {
   const connectTimeout = Number(process.env.TECHCARE_DB_CONNECT_TIMEOUT_MS || 10000);
   if (!Number.isInteger(connectTimeout) || connectTimeout < 1000 || connectTimeout > 120000)
     throw new Error('TECHCARE_DB_CONNECT_TIMEOUT_MS must be an integer from 1000 to 120000.');
-  if (process.env.NODE_ENV === 'production' && process.env.TECHCARE_DB_SSL !== '1')
+  // TLS protects traffic between machines; a database on this computer never leaves it.
+  const loopback = ['127.0.0.1', 'localhost', '::1'].includes(process.env.TECHCARE_DB_HOST);
+  if (process.env.NODE_ENV === 'production' && process.env.TECHCARE_DB_SSL !== '1' && !loopback)
     throw new Error('Production MySQL connections require TECHCARE_DB_SSL=1.');
 }
 

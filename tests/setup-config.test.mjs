@@ -122,6 +122,8 @@ test('production database configuration requires MySQL settings and never accept
     });
     assert.throws(assertDatabaseConfig, /TECHCARE_DB_PASSWORD/);
     process.env.TECHCARE_DB_PASSWORD = 'local-test-only';
+    assert.doesNotThrow(assertDatabaseConfig, 'a database on this computer needs no TLS');
+    process.env.TECHCARE_DB_HOST = 'db.example.internal';
     assert.throws(assertDatabaseConfig, /TECHCARE_DB_SSL=1/);
     process.env.TECHCARE_DB_SSL = '1';
     assert.doesNotThrow(assertDatabaseConfig);
