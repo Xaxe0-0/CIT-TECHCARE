@@ -1,6 +1,7 @@
 import { guides as defaultGuides } from './content';
 import type { Guide } from '../../../shared/src/types';
 import { helpSuggestions, helpTopics, type HelpTopic } from './assistant-knowledge';
+import { isFilipino } from '@shared/language.mjs';
 
 export type GuideReply = {
   text: string;
@@ -12,6 +13,8 @@ export type GuideReply = {
   // Built-in help has no answer; the page may ask the local AI instead.
   fallback?: boolean;
   source?: 'verified' | 'generated';
+  // The question was in Filipino, so labels around an AI answer are shown in Filipino.
+  filipino?: boolean;
   pending?: boolean;
 };
 
@@ -40,9 +43,39 @@ const topics = [
   { icon: 'shield', pattern: /\b(suspicious|phishing|scam|fraud|spam|safety|hacked|malicious)\b/ },
 ];
 
-function topicReply(topic: HelpTopic, detailed = false): GuideReply {
+// Exact + - * / with brackets for questions like "what is 1+1?"; null for anything else.
+function calculate(expression: string): number | null {
+  const plain = expression.replace(/[x×]/g, '*').replace(/÷/g, '/').replace(/\s+/g, '');
+  const tokens = plain.match(/\d+(?:\.\d+)?|[-+*/()]/g);
+  if (!tokens || tokens.join('') !== plain) return null;
+  let i = 0;
+  const factor = (): number => {
+    const token = tokens[i++];
+    if (token === '(') {
+      const value = sum();
+      return tokens[i++] === ')' ? value : NaN;
+    }
+    return token === '-' ? -factor() : Number(token);
+  };
+  const product = () => {
+    let value = factor();
+    while (tokens[i] === '*' || tokens[i] === '/')
+      value = tokens[i++] === '*' ? value * factor() : value / factor();
+    return value;
+  };
+  const sum = (): number => {
+    let value = product();
+    while (tokens[i] === '+' || tokens[i] === '-')
+      value = tokens[i++] === '+' ? value + product() : value - product();
+    return value;
+  };
+  const value = sum();
+  return i === tokens.length && Number.isFinite(value) ? Math.round(value * 1e10) / 1e10 : null;
+}
+
+function topicReply(topic: HelpTopic, detailed = false, fil = false): GuideReply {
   return {
-    text: topic.answer,
+    text: (fil && topic.answerFil) || topic.answer,
     topic: topic.id,
     link: topic.link,
     steps: detailed ? topic.steps : undefined,
@@ -55,23 +88,91 @@ export function getGuideReply(
   message: string,
   previousTopic?: string,
   guides: Guide[] = defaultGuides,
+  // The signed-in member (null when signed out); undefined when the caller does not know.
+  user?: { name: string } | null,
 ): GuideReply {
   const text = message.toLowerCase().replace(/[’']/g, ' ').replace(/\s+/g, ' ').trim();
-  if (/\b(swollen|swelling|burning|smoke|sparks|overheating|too hot)\b/.test(text)) {
+  // Conversational replies follow the person's language; guides and help topics stay in English.
+  const fil = isFilipino(text);
+  const say = (english: string, filipino: string) => (fil ? filipino : english);
+  if (
+    /\b(swollen|swelling|burning|smoke|sparks|overheating|too hot|namamaga|umuusok|nasusunog|sobrang init)\b/.test(
+      text,
+    )
+  ) {
     return {
-      text: 'Stop using the device if its battery is swollen, it is unusually hot, or there is a burning smell. Seek qualified support instead of trying further troubleshooting.',
-      link: { href: '/booth', label: 'Find support' },
+      text: say(
+        'Stop using the device if its battery is swollen, it is unusually hot, or there is a burning smell. Seek qualified support instead of trying further troubleshooting.',
+        'Itigil muna ang paggamit ng device kung namamaga ang battery, sobrang init nito, o may amoy na nasusunog. Magpatingin sa qualified na technician sa halip na subukan pang ayusin.',
+      ),
+      link: { href: '/booth', label: say('Find support', 'Humanap ng tulong') },
     };
   }
-  if (/^(thanks|thank you|thankyou|salamat)[!. ]*$/.test(text)) {
+  // Small talk is matched with stretched letters collapsed ("hiiii" → "hi", "thank youuu" → "thank you").
+  const casual = text.replace(/(.)\1+/g, '$1');
+  if (/^(thanks?|thank ?(you|u)|thanx|tnx|ty|salamat)( (po|so much|a lot))?[!.~ ]*$/.test(casual)) {
     return {
-      text: 'You’re welcome! What else would you like to know about TechCare?',
+      text: say(
+        'You’re welcome! What else would you like to know about TechCare?',
+        'Walang anuman! May iba ka pa bang gustong malaman tungkol sa TechCare?',
+      ),
       topic: previousTopic,
     };
   }
-  if (/^(hi|hello|hey|help)[!.? ]*$/.test(text)) {
+  if (
+    /^(hi|hiya|helo|hey|heya|hay|yo|sup|hola|help|god (morning|afternoon|evening|day)|kumusta|kamusta|musta)( (po|there|techcare|bot))?[!.?~ ]*$/.test(
+      casual,
+    )
+  ) {
     return {
-      text: 'Hello! Ask me about using TechCare or troubleshooting a device. You can start with one of these questions.',
+      text: say(
+        'Hello! Ask me about using TechCare or troubleshooting a device. You can start with one of these questions.',
+        'Kumusta! Magtanong ka tungkol sa paggamit ng TechCare o sa problema ng device mo. Puwede kang magsimula sa isa sa mga tanong na ito.',
+      ),
+      choices: helpSuggestions,
+    };
+  }
+  if (
+    /^(why|what|huh|ok|okay|oki|k|cool|nice|wow|lol|lmao|(ha|he)+|hm|ah|oh|eh|yes|yeah|ya|no|nope|sure|idk|bruh|test|testing|bakit|ano|sige|o|opo|hindi|di|talaga|weh|ayun|ganun)( po)?[!.?~ ]*$/.test(
+      casual,
+    )
+  ) {
+    return {
+      text: say(
+        'Could you tell me a bit more? Ask me about using TechCare or describe a device problem, or pick one of these questions.',
+        'Puwede mo bang ikuwento nang mas detalyado? Magtanong tungkol sa TechCare o ilarawan ang problema ng device mo, o pumili ng isa sa mga tanong na ito.',
+      ),
+      choices: helpSuggestions,
+    };
+  }
+  if (user !== undefined && /^(who am i|sino ako|do you know (me|who i am))[!.? ]*$/.test(text))
+    return user
+      ? {
+          text: say(
+            `You’re signed in as ${user.name}. I can’t see the rest of your account, but you can view and edit your profile in My Dashboard.`,
+            `Naka-sign in ka bilang ${user.name}. Hindi ko nakikita ang iba pang detalye ng account mo, pero makikita at mae-edit mo ang profile mo sa My Dashboard.`,
+          ),
+          link: { href: '/profile', label: say('Open My Dashboard', 'Buksan ang My Dashboard') },
+        }
+      : {
+          text: say(
+            'You’re not signed in, so I don’t know who you are. Sign in to see your profile and dashboard.',
+            'Hindi ka pa naka-sign in, kaya hindi ko alam kung sino ka. Mag-sign in para makita ang profile at dashboard mo.',
+          ),
+          link: { href: '/login', label: say('Sign in', 'Mag-sign in') },
+        };
+  const math =
+    /^(?:what is |what s |whats |how much is |calculate |ano ang |magkano ang |ilan ang )?([\d\s.()]*\d[\d\s.()]*(?:[-+*/x×÷][\d\s.()]+)+)[=? ]*$/.exec(
+      text,
+    );
+  const result = math ? calculate(math[1]) : null;
+  if (math && result !== null) {
+    const sum = `${math[1].trim()} = ${result}`;
+    return {
+      text: say(
+        `${sum}. That’s not a tech question, but it’s an easy one! I’m here for TechCare and device problems.`,
+        `${sum}. Hindi iyan tanong tungkol sa tech, pero madali lang! Nandito ako para sa TechCare at sa mga problema sa device.`,
+      ),
       choices: helpSuggestions,
     };
   }
@@ -98,8 +199,11 @@ export function getGuideReply(
     )
   ) {
     return {
-      text: 'Let’s get you more specific help. Use Ask the community and describe what you tried and what happened. I cannot inspect your account or device, so I cannot confirm the cause or make changes for you.',
-      link: { href: '/discussion', label: 'Open Discussion' },
+      text: say(
+        'Let’s get you more specific help. Use Ask the community and describe what you tried and what happened. I cannot inspect your account or device, so I cannot confirm the cause or make changes for you.',
+        'Humingi tayo ng mas tiyak na tulong. Gamitin ang Ask the community at ikuwento kung ano ang nasubukan mo at ano ang nangyari. Hindi ko makikita ang account o device mo, kaya hindi ko makukumpirma ang dahilan o magagawa ang pagbabago para sa iyo.',
+      ),
+      link: { href: '/discussion', label: say('Open Discussion', 'Buksan ang Discussion') },
     };
   }
   const namedTopic = helpTopics.find((topic) => topic.question.toLowerCase() === text);
@@ -112,24 +216,39 @@ export function getGuideReply(
   if (exact || matches.length === 1) {
     const guide = exact || matches[0];
     return {
-      text: 'Here are the steps from our guide. Start with the first check:',
+      text: say(
+        'Here are the steps from our guide. Start with the first check:',
+        'Ito ang mga hakbang mula sa guide namin (nasa English). Simulan sa unang check:',
+      ),
       guide,
       topic: `guide-${guide.id}`,
+      // Guides are English only, so a Filipino question asks the AI first: it has Filipino
+      // verified fixes, and this guide is shown if the AI is off or has nothing better.
+      fallback: fil || undefined,
     };
   }
   if (matches.length > 1)
     return {
-      text: 'I found a few possible guides. Which problem would you like to check first?',
+      text: say(
+        'I found a few possible guides. Which problem would you like to check first?',
+        'May ilang guide na posibleng tugma. Alin ang gusto mong tingnan muna?',
+      ),
       choices: matches.map((guide) => guide.title),
     };
   const topic = isDeviceQuestion(text)
     ? undefined
     : helpTopics.find((item) => item.matches.some((pattern) => pattern.test(text)));
-  if (topic) return topicReply(topic);
+  if (topic) return topicReply(topic, false, fil);
   return {
-    text: 'I don’t have a reliable answer for that in TechCare’s help content yet. I can explain the app’s features or share device guides. Try one of these questions, rephrase with a feature name, or ask the community for help.',
+    text: say(
+      'I don’t have a reliable answer for that in TechCare’s help content yet. I can explain the app’s features or share device guides. Try one of these questions, rephrase with a feature name, or ask the community for help.',
+      'Wala pa akong maaasahang sagot diyan sa help content ng TechCare. Kaya kong ipaliwanag ang mga feature ng app o magbahagi ng device guides. Subukan ang isa sa mga tanong na ito, ulitin gamit ang pangalan ng feature, o magtanong sa community.',
+    ),
     choices: helpSuggestions,
-    link: { href: '/discussion', label: 'Browse community discussions' },
+    link: {
+      href: '/discussion',
+      label: say('Browse community discussions', 'Tingnan ang community discussions'),
+    },
     fallback: true,
   };
 }

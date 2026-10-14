@@ -17,7 +17,7 @@ import {
   confirmEmailChange,
   deleteAccount,
 } from '../services/account.mjs';
-import { setSuspended, auditLog, feedbackSummary, feedbackCsv } from '../services/admin-tools.mjs';
+import { setSuspended, auditLog, feedbackSummary, exportCsv } from '../services/admin-tools.mjs';
 import { randomInt } from 'node:crypto';
 import { CONSENT_COOKIE, CONSENT_VERSION, hasConsent } from '../../../shared/src/consent.mjs';
 import { all, one, run, now, transaction } from '../config/db.mjs';
@@ -492,15 +492,20 @@ async function get(path, url, me, request) {
     return json(paginated(rows, 'users', page));
   }
   if (path === 'admin/audit') return json(await auditLog(url, me));
-  if (path === 'feedback.csv')
-    return new Response(await feedbackCsv(me), {
+  const exportName = /^([a-z-]+)\.csv$/.exec(path)?.[1];
+  if (exportName) {
+    const csv = await exportCsv(exportName, me);
+    if (csv === null) return json({ error: 'Not found.' }, 404);
+    // The byte-order mark makes Excel read names with ñ or accents correctly.
+    return new Response('﻿' + csv, {
       headers: {
         'Content-Type': 'text/csv; charset=utf-8',
-        'Content-Disposition': 'attachment; filename="techcare-feedback.csv"',
+        'Content-Disposition': `attachment; filename="techcare-${exportName}.csv"`,
         'Cache-Control': 'no-store',
         'X-Content-Type-Options': 'nosniff',
       },
     });
+  }
   throw new Problem('Endpoint not found.', 404);
 }
 
@@ -883,7 +888,7 @@ async function post(path, d, me, request) {
       'INSERT INTO feedback(user_id,rating,message,created) VALUES(?,?,?,?)',
       me.id,
       rating,
-      v.text(d.message, 'Feedback', 10, 1000),
+      d.message ? v.text(d.message, 'Feedback', 10, 1000) : '',
       time,
     );
     return json(

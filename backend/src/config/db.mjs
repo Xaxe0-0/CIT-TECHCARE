@@ -36,7 +36,9 @@ export function assertDatabaseConfig() {
   const connectTimeout = Number(process.env.TECHCARE_DB_CONNECT_TIMEOUT_MS || 10000);
   if (!Number.isInteger(connectTimeout) || connectTimeout < 1000 || connectTimeout > 120000)
     throw new Error('TECHCARE_DB_CONNECT_TIMEOUT_MS must be an integer from 1000 to 120000.');
-  if (process.env.NODE_ENV === 'production' && process.env.TECHCARE_DB_SSL !== '1')
+  // TLS protects traffic between machines; a database on this computer never leaves it.
+  const loopback = ['127.0.0.1', 'localhost', '::1'].includes(process.env.TECHCARE_DB_HOST);
+  if (process.env.NODE_ENV === 'production' && process.env.TECHCARE_DB_SSL !== '1' && !loopback)
     throw new Error('Production MySQL connections require TECHCARE_DB_SSL=1.');
 }
 
@@ -88,6 +90,10 @@ export async function assertDatabaseReady() {
     if (error.message?.includes('MySQL schema is not at version 9')) throw error;
     if (error.code === 'ER_NO_SUCH_TABLE')
       throw new Error('MySQL schema is missing. Apply backend/schema/mysql.sql before startup.');
+    if (error.code === 'ECONNREFUSED')
+      throw new Error(
+        `MySQL is not running at ${process.env.TECHCARE_DB_HOST}:${process.env.TECHCARE_DB_PORT || 3306}. Start it (XAMPP: open the Control Panel and start MySQL) and try again.`,
+      );
     throw new Error(
       `Unable to connect to the configured production MySQL database: ${error.code || error.name}.`,
     );

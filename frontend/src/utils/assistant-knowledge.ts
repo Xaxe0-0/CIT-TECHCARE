@@ -4,6 +4,8 @@ export type HelpTopic = {
   question: string;
   matches: RegExp[];
   answer: string;
+  // Filipino answer, used when the question is in Filipino; topics without one answer in English.
+  answerFil?: string;
   steps: string[];
   link?: { href: string; label: string };
 };
@@ -32,10 +34,12 @@ export const helpTopics: HelpTopic[] = [
     question: 'What can you help with?',
     matches: [
       /\b(chatbot|assistant|chatgpt|openai|api|ai|bot)\b/,
-      /what can you|who are you|are you human|how do you work/,
+      /what can (you|u)|(who|what) (are|r) (you+|u+)\b|are (you|u) (a )?(human|real|robot)|how do (you|u) work|\b(sino|ano) (ka|ka ba|po kayo)\b|ano (ang )?(kaya|magagawa) mo/,
     ],
     answer:
       'I’m TechCare’s help assistant. I explain how this website works and share troubleshooting guides from the project’s help content. When the site runs a local AI model, I also answer common tech problems, using verified fixes where they match. There is no ChatGPT account or paid AI service. I cannot view your account, perform actions for you, or answer general-knowledge questions; for those, ask the community.',
+    answerFil:
+      'Ako ang help assistant ng TechCare. Ipinapaliwanag ko kung paano gumagana ang website na ito at nagbabahagi ako ng troubleshooting guides mula sa help content ng project. Kapag may local AI model ang site, sinasagot ko rin ang mga karaniwang problema sa tech gamit ang verified fixes kapag may tugma. Walang ChatGPT account o bayad na AI service. Hindi ko makikita ang account mo, hindi ako makakagawa ng aksyon para sa iyo, at hindi ako sumasagot ng general-knowledge na tanong; para diyan, magtanong sa community.',
     steps: [
       'Ask about accounts, discussions, friends, messages, privacy, resources, or the support booth.',
       'After an answer, ask “Show me the steps” for more detail.',

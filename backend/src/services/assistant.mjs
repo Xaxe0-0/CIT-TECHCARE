@@ -1,6 +1,8 @@
 import { Problem, throttle } from '../middleware/auth.mjs';
 import * as v from '../validations/validation.mjs';
 import { findFixes, looksTechnical } from './tech-fixes.mjs';
+import { filipinoFixes } from './tech-fixes-fil.mjs';
+import { isFilipino } from '../../../shared/src/language.mjs';
 
 // Answers come from local Ollama models in two steps:
 // 1. Keywords propose verified fixes and an embedding model checks one is about the same
@@ -139,15 +141,26 @@ export async function streamAnswer(d, me, signal) {
   await throttle('source:assistant', 30, 60);
   if (me) await throttle(`assistant:${me.id}`, 10, 60);
   const question = v.text(d.message, 'Question', 2, 400);
-  if (!looksTechnical(question)) return { source: 'generated', stream: textStream(ESCALATE) };
-  const fix = await matchFix(question, signal);
-  if (fix)
+  // Not a tech question: say so plainly instead of sending the person to Discussion.
+  if (!looksTechnical(question))
     return {
-      source: 'verified',
+      source: 'off-topic',
       stream: textStream(
-        [`${fix.title}:`, ...fix.steps.map((step, i) => `${i + 1}. ${step}`)].join('\n'),
+        isFilipino(question)
+          ? 'Hindi iyan tanong tungkol sa tech, kaya hindi ko iyan masasagot dito. Makakatulong ako sa mga feature ng TechCare at sa mga problema sa device, gaya ng Wi-Fi, printer, mabagal na laptop, o phone.'
+          : 'That’s not a tech question, so I can’t help with it here. I can help with TechCare features and device problems, like Wi-Fi, printers, slow laptops, or phones.',
       ),
     };
+  const fix = await matchFix(question, signal);
+  if (fix) {
+    // Filipino questions get the hand-written Filipino fix; generated answers stay in English
+    // because the local model's Filipino is not reliable enough for step-by-step help.
+    const { title, steps } = (isFilipino(question) && filipinoFixes[fix.title]) || fix;
+    return {
+      source: 'verified',
+      stream: textStream([`${title}:`, ...steps.map((step, i) => `${i + 1}. ${step}`)].join('\n')),
+    };
+  }
   const upstream = await ollama(
     {
       stream: true,

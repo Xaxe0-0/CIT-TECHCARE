@@ -23,7 +23,16 @@ export const techFixes = [
   },
   {
     title: 'Cannot connect to Wi-Fi or Wi-Fi is missing',
-    keywords: ['wifi', 'wi-fi', 'wireless', 'cant connect', 'wrong password'],
+    keywords: [
+      'wifi',
+      'wi-fi',
+      'wireless',
+      'cant connect',
+      'wrong password',
+      'ayaw mag connect',
+      'hindi maka connect',
+      'walang wifi',
+    ],
     steps: [
       'Make sure Wi-Fi is on and airplane mode is off.',
       'Forget the network, then reconnect and type the password carefully.',
@@ -43,6 +52,9 @@ export const techFixes = [
       'hang',
       'takes long',
       'performance',
+      'bagal laptop',
+      'bagal computer',
+      'bagal pc',
     ],
     steps: [
       'Restart the computer; many slowdowns clear after a full restart.',
@@ -72,6 +84,7 @@ export const techFixes = [
       'speaker',
       'speakers',
       'walang tunog',
+      'mahina tunog',
       'volume',
       'headphones not working',
     ],
@@ -105,7 +118,7 @@ export const techFixes = [
   },
   {
     title: 'Printer shows offline (Windows 11)',
-    keywords: ['printer', 'print', 'printing', 'offline', 'mag-print'],
+    keywords: ['printer', 'print', 'printing', 'offline', 'mag-print', 'ayaw mag print'],
     excludes: ['blank', 'jam', 'jammed', 'streaks', 'faded', 'smudge', 'ink', 'toner'],
     steps: [
       'Turn the printer off and on, and check its cable or that it is on the same Wi-Fi network as the computer.',
@@ -117,7 +130,16 @@ export const techFixes = [
   },
   {
     title: 'Bluetooth device will not pair or connect',
-    keywords: ['bluetooth', 'pair', 'pairing', 'earbuds', 'headset', 'airpods', 'speaker connect'],
+    keywords: [
+      'bluetooth',
+      'pair',
+      'pairing',
+      'earbuds',
+      'headset',
+      'airpods',
+      'speaker connect',
+      'ayaw mag pair',
+    ],
     steps: [
       'Turn Bluetooth off and on on both the phone or computer and the accessory, and charge the accessory.',
       'Put the accessory in pairing mode (usually holding its power or pairing button until a light flashes).',
@@ -135,6 +157,7 @@ export const techFixes = [
       'charger',
       'charging',
       'ayaw mag-charge',
+      'hindi nagcha charge',
     ],
     steps: [
       'Check both ends of the charger and try another wall outlet.',
@@ -158,6 +181,8 @@ export const techFixes = [
       'no display',
       'dead',
       'ayaw mag-on',
+      'ayaw bumukas',
+      'hindi mag on',
       'blank screen',
     ],
     steps: [
@@ -170,7 +195,17 @@ export const techFixes = [
   },
   {
     title: 'App or computer frozen',
-    keywords: ['frozen', 'freeze', 'not responding', 'stuck', 'crash', 'crashing', 'nag-hang'],
+    keywords: [
+      'frozen',
+      'freeze',
+      'not responding',
+      'stuck',
+      'crash',
+      'crashing',
+      'nag-hang',
+      'naka hang',
+      'nagha hang',
+    ],
     steps: [
       'Wait a minute in case the app is finishing a task.',
       'Windows: press Ctrl + Shift + Esc, select the app in Task Manager, and choose End task.',
@@ -214,7 +249,17 @@ export const techFixes = [
   },
   {
     title: 'Keyboard or mouse not working',
-    keywords: ['keyboard', 'mouse', 'touchpad', 'trackpad', 'keys', 'wrong letters', 'typing'],
+    keywords: [
+      'keyboard',
+      'mouse',
+      'touchpad',
+      'trackpad',
+      'keys',
+      'wrong letters',
+      'typing',
+      'ayaw gumana mouse',
+      'ayaw gumana keyboard',
+    ],
     steps: [
       'For wireless devices, replace or charge the batteries and switch them off and on.',
       'Reconnect USB devices or try another USB port.',
@@ -286,6 +331,8 @@ export const techFixes = [
       'iphone slow',
       'mabagal phone',
       'phone lag',
+      'bagal phone',
+      'bagal cellphone',
     ],
     steps: [
       'Restart the phone.',
@@ -299,6 +346,11 @@ export const techFixes = [
     title: 'Slow internet speed',
     keywords: [
       'slow internet',
+      'bagal wifi',
+      'bagal internet',
+      'bagal net',
+      'hina wifi',
+      'mahina signal',
       'slow wifi',
       'internet slow',
       'buffering',
@@ -323,6 +375,8 @@ export const techFixes = [
       'snip',
       'print screen',
       'printscreen',
+      'mag screenshot',
+      'mag ss',
     ],
     steps: [
       'Windows: press Windows key + Shift + S to select an area with Snipping Tool, or Windows key + Print Screen to save the whole screen to Pictures > Screenshots.',
@@ -352,6 +406,8 @@ export const techFixes = [
       'rebooting',
       'keeps restarting',
       'turns off by itself',
+      'kusang nagre restart',
+      'kusang namamatay',
     ],
     steps: [
       'Install the latest system update and update all apps.',
@@ -383,6 +439,7 @@ export const techFixes = [
       'battery life',
       'lowbat',
       'malowbat',
+      'mabilis maubos battery',
     ],
     steps: [
       'Lower screen brightness and close apps you are not using.',
@@ -394,7 +451,16 @@ export const techFixes = [
   },
   {
     title: 'Device overheating',
-    keywords: ['overheating', 'overheat', 'too hot', 'mainit', 'heats up', 'hot'],
+    keywords: [
+      'overheating',
+      'overheat',
+      'too hot',
+      'mainit',
+      'heats up',
+      'hot',
+      'init',
+      'umiinit',
+    ],
     steps: [
       'If the battery is swollen, or you notice smoke or a burning smell, stop using the device and get qualified help.',
       'Keep vents clear: use laptops on a hard, flat surface, not on beds or pillows.',
@@ -458,10 +524,11 @@ export const techFixes = [
   },
 ];
 
+// Hyphens split words, so "mag-charge" and "mag charge" (or "wi-fi" and "wi fi") match alike.
 const words = (text) =>
   text
     .toLowerCase()
-    .replace(/[^a-z0-9+\- ]+/g, ' ')
+    .replace(/[^a-z0-9+ ]+/g, ' ')
     .split(/\s+/)
     .filter(Boolean);
 
@@ -487,14 +554,14 @@ export function findFixes(question, limit = 3) {
 // asking the model (which sometimes answers trivia despite its instructions).
 const techWords = new Set(
   `computer laptop pc desktop phone cellphone tablet ipad iphone android windows mac macos linux chromebook
-  wifi wi-fi internet network router modem bluetooth hotspot data signal connect connection connected
+  wifi wi fi internet network router modem bluetooth hotspot data signal connect connection connected
   app apps application software program browser chrome edge firefox safari website site email gmail outlook
   account password login log sign printer print scanner monitor screen display projector hdmi usb cable port
   keyboard mouse touchpad speaker speakers sound audio mic microphone camera webcam headphones earbuds headset
   battery charger charge charging power boot startup restart update updates install download upload file files
   folder storage drive disk memory ram cpu virus malware hacked scam phishing error crash crashing freeze frozen
   slow lag hang zoom teams meet word excel powerpoint office pdf device devices settings driver drivers
-  turn reset reboot tunog mabagal ayaw nag-hang nabura sira gamit cellphone selpon lowbat malowbat`
+  turn reset reboot tunog mabagal bagal ayaw nabura sira gamit cellphone selpon lowbat malowbat`
     .split(/\s+/)
     .filter(Boolean),
 );

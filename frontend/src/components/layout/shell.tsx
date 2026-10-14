@@ -27,8 +27,10 @@ import {
 } from '@phosphor-icons/react';
 import { Avatar, Modal } from '../ui/ui';
 import { api } from '@/services/api';
+import { clearDataCache } from '@/hooks/use-data';
 import type { User } from '@shared/types';
 import { GuideAssistant } from '../features/guide-assistant';
+import { ExitFeedback } from '../features/exit-feedback';
 import { NavigationDock } from './navigation-dock';
 import { authPaths, emptyAuthDraft, type AuthDraft, type AuthMode } from '@/utils/auth-pages';
 const navigation = [
@@ -82,6 +84,7 @@ export function Shell({
     router = useRouter();
   const refresh = () => setVersion((n) => n + 1);
   const setUser = (u: User | null) => {
+    clearDataCache();
     setUserState(u);
     refresh();
   };
@@ -175,7 +178,10 @@ export function Shell({
   useEffect(() => {
     const refreshSession = () => {
       api<{ user: User | null }>('me')
-        .then((result) => setUserState(result.user))
+        .then((result) => {
+          clearDataCache();
+          setUserState(result.user);
+        })
         .catch(() =>
           setNotice('Could not refresh your session. Your current page is still available.'),
         );
@@ -215,6 +221,7 @@ export function Shell({
   }, [version]);
   useEffect(() => {
     function expired() {
+      clearDataCache();
       setUserState(null);
       setVersion((n) => n + 1);
       setNotice('Your session has expired. Please sign in again.');
@@ -392,17 +399,20 @@ export function Shell({
         Skip to content
       </a>
       <div className="campus-backdrop" aria-hidden="true">
+        {/* The current theme's backdrop downloads first; the other is ready for the fade. */}
         <img
           className="campus-day"
           src={`/static/campus/${campusScene}.webp`}
           alt=""
           decoding="async"
+          fetchPriority={theme === 'dark' ? 'low' : 'high'}
         />
         <img
           className="campus-night"
           src={`/static/campus/${campusScene}-dark.webp`}
           alt=""
           decoding="async"
+          fetchPriority={theme === 'dark' ? 'high' : 'low'}
         />
       </div>
       {menu && (
@@ -424,7 +434,7 @@ export function Shell({
       >
         <Link href="/" className="brand" aria-label="TechCare home" onClick={() => setMenu(false)}>
           <span className="brand-mark custom-brand">
-            <img src={logo || '/static/techcare-logo.png'} alt="" />
+            <img src={logo || '/static/techcare-logo.webp'} alt="" />
           </span>
           <span className="brand-name">
             Tech<span>Care</span>
@@ -549,6 +559,7 @@ export function Shell({
         </footer>
       </div>
       <GuideAssistant key={user?.id ?? 'guest'} onAsk={ask} />
+      {user && <ExitFeedback key={`feedback-${user.id}`} />}
       {notice && (
         <div className="toast" role="status">
           <ShieldCheck size={22} />

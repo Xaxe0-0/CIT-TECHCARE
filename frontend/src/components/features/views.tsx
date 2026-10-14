@@ -19,6 +19,7 @@ import {
   Image as ImageIcon,
   Link as LinkIcon,
   Users,
+  DownloadSimple,
 } from '@phosphor-icons/react';
 import { useTechCare } from '@/context/techcare-context';
 import {
@@ -34,6 +35,7 @@ import {
   Pagination,
   Search,
   Select,
+  StarRating,
   Success,
   TextArea,
   Upload,
@@ -343,25 +345,7 @@ function Feedback() {
               setDone(true);
             }}
           >
-            <fieldset className="rating-field">
-              <legend>Your rating</legend>
-              <div className="rating-stars">
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <label key={n} title={`${n} out of 5`}>
-                    <input
-                      type="radio"
-                      name="rating"
-                      value={n}
-                      checked={rating === n}
-                      onChange={() => setRating(n)}
-                      aria-label={`${n} out of 5`}
-                    />
-                    <Star size={37} weight={n <= rating ? 'fill' : 'regular'} />
-                  </label>
-                ))}
-                <span>{rating} / 5</span>
-              </div>
-            </fieldset>
+            <StarRating value={rating} onChange={setRating} />
             <TextArea
               label="What worked well? What could be better?"
               name="message"
@@ -929,6 +913,7 @@ function AdminAppSettings() {
         )}
         <Pagination page={page} hasMore={result.data?.hasMore || false} onPage={setPage} />
       </section>
+      <DataExports />
       <ActivityLog />
       <LogoSettings />
       <section className="panel hero-admin">
@@ -982,6 +967,37 @@ function AdminAppSettings() {
         </p>
       </div>
     </>
+  );
+}
+
+const dataExports = [
+  { name: 'feedback', label: 'Feedback', note: 'Every rating with its comment' },
+  { name: 'ratings', label: 'Rating summary', note: 'Responses per star and the average' },
+  { name: 'users', label: 'Members', note: 'Accounts, roles, and status' },
+  { name: 'discussions', label: 'Discussions', note: 'Questions with votes and replies' },
+  { name: 'lost-found', label: 'Lost & Found', note: 'Reports and returns' },
+  { name: 'reports', label: 'Content reports', note: 'Flagged posts and their outcome' },
+  { name: 'audit', label: 'Activity log', note: 'Every staff decision' },
+];
+function DataExports() {
+  return (
+    <section className="panel data-exports">
+      <h2>Export data</h2>
+      <p>
+        Download a CSV that opens in Excel or Google Sheets. Exports include private details, so
+        store them carefully.
+      </p>
+      <ul>
+        {dataExports.map((item) => (
+          <li key={item.name}>
+            <a className="button secondary small" href={`/api/${item.name}.csv`} download>
+              <DownloadSimple size={16} aria-hidden="true" /> {item.label}
+            </a>
+            <span className="muted">{item.note}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

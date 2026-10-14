@@ -24,14 +24,14 @@ export async function startNextServer(dev) {
     webpack: dev,
   });
   await app.prepare();
+  // Next attaches its own 'upgrade' listener on the first request, which also closes /ws sockets
+  // and made browsers reconnect (and reload page data) every few seconds. attachRealtime below
+  // already forwards every other upgrade to Next, so skip Next's duplicate listener.
+  app.didWebSocketSetup = true;
 
   const requestHandler = app.getRequestHandler();
   const server = createServer((request, response) => requestHandler(request, response));
-  const stopRealtime = attachRealtime(
-    server,
-    process.env.TECHCARE_ORIGIN,
-    app.getUpgradeHandler(),
-  );
+  const stopRealtime = attachRealtime(server, process.env.TECHCARE_ORIGIN, app.getUpgradeHandler());
 
   try {
     await new Promise((resolveListen, rejectListen) => {

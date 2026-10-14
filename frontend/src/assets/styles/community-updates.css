@@ -116,7 +116,7 @@
   padding: 0;
   background:
     linear-gradient(rgb(13 32 55 / 28%), rgb(13 32 55 / 45%)),
-    url('/static/campus/consent-campus-building.png') center / cover fixed;
+    url('/static/campus/consent-campus-building.webp') center / cover fixed;
 }
 .consent-welcome {
   padding: 40px;
@@ -206,7 +206,7 @@
 :root[data-theme='dark'] .consent-screen {
   background-image:
     linear-gradient(rgb(0 0 0 / 16%), rgb(0 0 0 / 35%)),
-    url('/static/campus/consent-campus-building.png');
+    url('/static/campus/consent-campus-building.webp');
 }
 @media (max-width: 700px) {
   .discussion-search-sort {
