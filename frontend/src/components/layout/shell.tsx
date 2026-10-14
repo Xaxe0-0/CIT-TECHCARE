@@ -27,6 +27,7 @@ import {
 } from '@phosphor-icons/react';
 import { Avatar, Modal } from '../ui/ui';
 import { api } from '@/services/api';
+import { clearDataCache } from '@/hooks/use-data';
 import type { User } from '@shared/types';
 import { GuideAssistant } from '../features/guide-assistant';
 import { ExitFeedback } from '../features/exit-feedback';
@@ -83,6 +84,7 @@ export function Shell({
     router = useRouter();
   const refresh = () => setVersion((n) => n + 1);
   const setUser = (u: User | null) => {
+    clearDataCache();
     setUserState(u);
     refresh();
   };
@@ -176,7 +178,10 @@ export function Shell({
   useEffect(() => {
     const refreshSession = () => {
       api<{ user: User | null }>('me')
-        .then((result) => setUserState(result.user))
+        .then((result) => {
+          clearDataCache();
+          setUserState(result.user);
+        })
         .catch(() =>
           setNotice('Could not refresh your session. Your current page is still available.'),
         );
@@ -216,6 +221,7 @@ export function Shell({
   }, [version]);
   useEffect(() => {
     function expired() {
+      clearDataCache();
       setUserState(null);
       setVersion((n) => n + 1);
       setNotice('Your session has expired. Please sign in again.');
