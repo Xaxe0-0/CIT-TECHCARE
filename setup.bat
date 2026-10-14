@@ -146,8 +146,13 @@ if not exist "node_modules\@next\env" (
   echo !ERR!TechCare is not set up yet. Run this again and choose option 2 first.!RESET!
   goto fail
 )
+netstat -ano | findstr /r /c:"127\.0\.0\.1:3100 .*LISTENING" >nul
+if not errorlevel 1 (
+  echo !TEAL!TechCare is already being shared from this computer.!RESET! Stop that window first to restart it.
+  goto end
+)
 echo.
-echo !BLUE![1/5]!RESET! Checking the sharing settings...
+echo !BLUE![1/5]!RESET! Checking the sharing settings and database...
 call node scripts\setup-sharing.mjs
 if errorlevel 1 goto fail
 set "PUBLIC_ORIGIN="
@@ -204,7 +209,10 @@ echo Press Ctrl+C here to stop, then close the tunnel window.
 start "TechCare tunnel" /min "!CLOUDFLARED!" tunnel run --url http://127.0.0.1:3100 techcare
 set "PORT=3100"
 call npm start
-goto end
+rem The server stopped (or failed to start): close the tunnel so it is not left pointing at nothing.
+taskkill /fi "WINDOWTITLE eq TechCare tunnel*" >nul 2>nul
+echo !WARN!TechCare stopped, and the tunnel was closed. Run option 3 again to share.!RESET!
+goto fail
 
 rem ---------------------------------------------------------------- helpers
 :running

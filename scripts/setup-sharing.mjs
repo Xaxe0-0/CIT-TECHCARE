@@ -103,4 +103,14 @@ if (missing.length) {
   );
   process.exit(1);
 }
+process.env.NODE_ENV = 'production';
+const { assertDatabaseReady, closeMySQLPool } = await import('../backend/src/config/db.mjs');
+try {
+  await assertDatabaseReady();
+} catch (error) {
+  console.error(error.message);
+  process.exit(1);
+} finally {
+  await closeMySQLPool();
+}
 console.log(`Ready to share at ${new URL(process.env.TECHCARE_ORIGIN).origin}`);

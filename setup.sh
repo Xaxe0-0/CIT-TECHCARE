@@ -121,8 +121,12 @@ share_online() {
   if [ ! -d node_modules/@next/env ]; then
     fail "TechCare is not set up yet. Run ./setup.sh 2 first."
   fi
+  if curl -s -o /dev/null http://127.0.0.1:3100/api/settings; then
+    echo "${TEAL}TechCare is already being shared from this computer.${RESET} Stop that window first to restart it."
+    exit 0
+  fi
   echo
-  step "[1/5]" "Checking the sharing settings..."
+  step "[1/5]" "Checking the sharing settings and database..."
   node scripts/setup-sharing.mjs || exit 1
   origin=$(grep -E '^TECHCARE_ORIGIN=' .env.production.local | tail -n 1 | cut -d= -f2-)
   host=${origin#https://}

@@ -90,6 +90,10 @@ export async function assertDatabaseReady() {
     if (error.message?.includes('MySQL schema is not at version 9')) throw error;
     if (error.code === 'ER_NO_SUCH_TABLE')
       throw new Error('MySQL schema is missing. Apply backend/schema/mysql.sql before startup.');
+    if (error.code === 'ECONNREFUSED')
+      throw new Error(
+        `MySQL is not running at ${process.env.TECHCARE_DB_HOST}:${process.env.TECHCARE_DB_PORT || 3306}. Start it (XAMPP: open the Control Panel and start MySQL) and try again.`,
+      );
     throw new Error(
       `Unable to connect to the configured production MySQL database: ${error.code || error.name}.`,
     );
