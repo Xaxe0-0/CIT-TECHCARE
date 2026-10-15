@@ -724,9 +724,10 @@ button.inbox-row:hover,
   gap: 6px;
   min-height: 40px;
   padding: 6px 10px;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.2;
-  white-space: normal;
+  /* Labels stay on one line; .member-grid keeps cards wide enough for "Accept request". */
+  white-space: nowrap;
 }
 :root[data-theme] .member-card .member-actions .member-message {
   grid-column: 1 / -1;

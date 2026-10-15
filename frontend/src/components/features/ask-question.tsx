@@ -96,8 +96,9 @@ export function AskQuestionPage() {
           </Form>
         </section>
         <aside className="ask-question-notes" aria-labelledby="question-notes-title">
-          <ChatCircleDots size={25} aria-hidden="true" />
-          <h2 id="question-notes-title">Help others understand the issue</h2>
+          <h2 id="question-notes-title">
+            <ChatCircleDots size={22} aria-hidden="true" /> Help others understand the issue
+          </h2>
           <ul>
             <li>Name the device, app, or operating system.</li>
             <li>Include the exact error message when possible.</li>

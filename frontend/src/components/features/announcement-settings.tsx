@@ -48,6 +48,7 @@ function AnnouncementEditor({
     >
       <Form
         publishing
+        cancel={{ label: 'Cancel', onClick: close }}
         submit="Publish announcement"
         onSubmit={async (values, progress) => {
           const result = await api<Result>(
@@ -134,9 +135,6 @@ function AnnouncementEditor({
           value={item?.link}
           placeholder="https://…"
         />
-        <Link href="/admin" className="text-button">
-          Cancel
-        </Link>
       </Form>
     </EditorFrame>
   );

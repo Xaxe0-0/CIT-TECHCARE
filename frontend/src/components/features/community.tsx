@@ -74,11 +74,13 @@ export function Members() {
             <article className="member-card" key={u.id}>
               <div className="member-heading">
                 <Avatar user={u} large />
-                {u.role !== 'member' && (
-                  <Badge tone="role">{u.role === 'admin' ? 'Administrator' : 'Moderator'}</Badge>
-                )}
+                <div>
+                  <h2>{u.name}</h2>
+                  {u.role !== 'member' && (
+                    <Badge tone="role">{u.role === 'admin' ? 'Administrator' : 'Moderator'}</Badge>
+                  )}
+                </div>
               </div>
-              <h2>{u.name}</h2>
               <p>
                 {u.visibility === 'private' && u.friendship !== 'friends' && user?.id !== u.id ? (
                   <span>

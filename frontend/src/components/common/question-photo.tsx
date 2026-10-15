@@ -315,9 +315,8 @@ export function QuestionImage({
           aria-label={`Open photo ${i + 1} of ${list.length} for ${title} in a new tab`}
         >
           <img src={url} alt={`Photo ${i + 1} attached to: ${title}`} loading="lazy" />
-          <span className="action-link">
-            <MagnifyingGlassPlus size={18} aria-hidden="true" />
-            {list.length > 1 ? `Open photo ${i + 1}` : 'Open full photo'}
+          <span className="photo-zoom" aria-hidden="true">
+            <MagnifyingGlassPlus size={18} />
           </span>
         </a>
       ))}

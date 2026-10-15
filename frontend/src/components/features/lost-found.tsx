@@ -251,6 +251,7 @@ export function LostFoundEditor() {
       <Form
         key={item?.id ?? 'new'}
         submit={item ? 'Save changes and resubmit notice' : 'Post my lost & found notice'}
+        cancel={{ label: 'Cancel', onClick: () => router.push('/lostfound') }}
         onSubmit={async (values, progress) => {
           const response = await api<Result>(
             'lost-found',
@@ -305,16 +306,13 @@ export function LostFoundEditor() {
           {photos < 4 && (
             <button
               type="button"
-              className="button secondary"
+              className="button secondary small add-photo"
               onClick={() => setPhotos(photos + 1)}
             >
               <Plus size={18} /> Add another photo
             </button>
           )}
         </section>
-        <Link href="/lostfound" className="text-button">
-          Cancel
-        </Link>
       </Form>
     </EditorFrame>
   );

@@ -62,11 +62,6 @@ export function MyQuestion({ post: p, changed }: { post: Post; changed: () => vo
       <div>
         <h3>{p.title}</h3>
         <small>{date(p.created)}</small>
-        {p.photo && (
-          <a className="action-link" href={p.photo} target="_blank" rel="noopener noreferrer">
-            <ImageIcon size={18} aria-hidden="true" /> View attached photo
-          </a>
-        )}
         <ReviewNote status={p.status} note={p.review_note} />
         <div className="own-actions">
           {p.status === 'published' ? (
@@ -77,6 +72,11 @@ export function MyQuestion({ post: p, changed }: { post: Post; changed: () => vo
             <Link className="text-button" href={'/discussion/ask?edit=' + p.id}>
               {p.status === 'rejected' ? 'Edit & resubmit' : 'Edit'}
             </Link>
+          )}
+          {p.photo && (
+            <a className="text-button" href={p.photo} target="_blank" rel="noopener noreferrer">
+              <ImageIcon size={18} aria-hidden="true" /> Photo
+            </a>
           )}
           <DeleteButton label="question" path="posts/delete" id={p.id} done={changed} />
         </div>

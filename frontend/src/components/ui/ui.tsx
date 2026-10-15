@@ -446,7 +446,8 @@ export function Select({
       <select name={name} defaultValue={value}>
         {options.map((o) => (
           <option key={o} value={o}>
-            {o}
+            {/* Values stay as stored ("lost", "public"); people read them capitalized. */}
+            {o.charAt(0).toUpperCase() + o.slice(1)}
           </option>
         ))}
       </select>

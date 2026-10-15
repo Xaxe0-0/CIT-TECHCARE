@@ -248,33 +248,36 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
       <div className="auth-links">
         {mode === 'login' ? (
           <>
-            <Link className="text-button" href={authPaths.forgot} onClick={() => setMessage('')}>
+            <Link className="auth-link" href={authPaths.forgot} onClick={() => setMessage('')}>
               Forgot password?
             </Link>
-            <Link className="text-button" href={authPaths.verify} onClick={() => setMessage('')}>
+            <Link className="auth-link" href={authPaths.verify} onClick={() => setMessage('')}>
               Verify a pending account
             </Link>
             <p>
               New here?{' '}
               <Link
-                className="text-button"
+                className="auth-link"
                 href={authPaths.register}
                 onClick={() => setMessage('')}
               >
-                Create Account
+                Create an account
               </Link>
             </p>
           </>
         ) : (
           <>
-            <Link className="text-button" href={authPaths.login} onClick={() => setMessage('')}>
-              Back to Sign In
-            </Link>
             {mode === 'forgot' && (
-              <Link className="text-button" href={authPaths.reset} onClick={() => setMessage('')}>
-                Reset password with a token
+              <Link className="auth-link" href={authPaths.reset} onClick={() => setMessage('')}>
+                Already have a token? Reset your password
               </Link>
             )}
+            <p>
+              {mode === 'register' ? 'Already have an account? ' : 'Remembered it? '}
+              <Link className="auth-link" href={authPaths.login} onClick={() => setMessage('')}>
+                Sign in
+              </Link>
+            </p>
           </>
         )}
       </div>

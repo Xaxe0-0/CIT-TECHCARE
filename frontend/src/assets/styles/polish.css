@@ -1,0 +1,181 @@
+/* Layout and consistency fixes from the 2026-10 UI review. Loaded last so these win over the
+   earlier theme layers; keep each rule scoped to the component it fixes. */
+
+/* Icons sit beside their heading instead of alone on a line above it. */
+.sidebar-help h3,
+.ask-question-notes h2,
+.editor-notes h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sidebar-help h3 svg,
+.ask-question-notes h2 svg,
+.editor-notes h2 svg {
+  flex-shrink: 0;
+  color: var(--blue);
+}
+.ask-question-notes h2 {
+  margin-top: 0;
+  font-weight: 650;
+}
+
+/* My Dashboard: readable rows with one row of equal actions, and a less crowded profile form. */
+@media (min-width: 1201px) {
+  .profile-layout {
+    grid-template-columns: minmax(300px, 1fr) minmax(0, 1fr);
+  }
+}
+.own-question {
+  align-items: flex-start;
+}
+.own-question h3 {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.own-question small {
+  font-size: 14px;
+}
+.own-actions {
+  gap: 8px;
+}
+:root[data-theme] .own-actions :is(.text-button, .button) {
+  min-height: 38px;
+  padding: 6px 14px;
+  font-size: 15px;
+}
+.profile-layout :is(.field-hint, .form-hint) {
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+/* Question photos: the photo itself opens full size; a small zoom badge replaces the buttons. */
+.question-image {
+  position: relative;
+  display: inline-block;
+}
+.question-images .question-image {
+  display: block;
+}
+.question-images .question-image img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+.photo-zoom {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgb(15 23 42 / 62%);
+  color: #fff;
+}
+
+/* Member cards: name and role beside the avatar; actions in an even two-column grid. */
+.member-heading {
+  justify-content: flex-start;
+  margin-bottom: 12px;
+}
+.member-heading h2 {
+  margin: 0 0 4px;
+  font-size: 19px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.member-card > p {
+  font-size: 15px;
+  color: var(--muted);
+  min-height: 0;
+}
+.member-grid {
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+}
+
+/* One heading system: the theme sets h1/h2 to weight 400 and only some pages overrode it, so
+   card and section titles were thin next to bold page titles. Page titles 700, sections 600. */
+.editor-heading h1 {
+  font-weight: 700;
+}
+#main-content h2,
+.dialog-heading h2 {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.queue-card .post-top span {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* Sidebar: a compact help card so the full menu (including My Dashboard, Moderator and Admin)
+   fits on 900px-tall screens; on very short screens the card gives way to the menu entirely. */
+.sidebar-help {
+  padding: 12px 14px;
+}
+.sidebar-help h3 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+:root[data-theme] .sidebar-help .action-link {
+  min-height: 0;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  justify-content: flex-start;
+  font-size: 15px;
+}
+@media (max-height: 760px) {
+  .sidebar-help {
+    display: none;
+  }
+}
+/* On laptop-height screens, tighter menu rows keep every item (Moderator and Admin included)
+   visible without scrolling the menu; tall screens keep the roomier spacing. */
+@media (min-width: 768px) and (max-height: 1000px) {
+  .sidebar .nav-item {
+    min-height: 0;
+    padding-block: 4px;
+  }
+  .sidebar .nav-icon {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+/* "Add another photo" is a normal-width secondary action, not a full-width bar. */
+.step-builder .add-photo {
+  justify-self: start;
+}
+
+/* Phones: form buttons stack full width with the main action first; wider screens keep them
+   side by side. */
+@media (max-width: 480px) {
+  .form-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  :root[data-theme] .form-actions .button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* Phone-width member cards: buttons stack full width so long labels like "Accept request" fit. */
+@media (max-width: 480px) {
+  :root[data-theme] .member-card .member-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Tablet top bar: the signed-in icons plus the username overflowed by a few pixels at 768px;
+   below 900px the account chip shows only the avatar (the link keeps its "My dashboard" label). */
+@media (max-width: 900px) {
+  .topbar .account-button > span:not(.avatar) {
+    display: none;
+  }
+}
