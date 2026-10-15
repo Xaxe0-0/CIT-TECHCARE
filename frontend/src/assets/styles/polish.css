@@ -179,3 +179,15 @@
     display: none;
   }
 }
+
+/* Placeholders are examples ("e.g. ana_reyes"), so they are fainter than typed values and never
+   mistaken for a filled-in field. The label and hint under each field carry the real guidance. */
+:is(input, textarea)::placeholder {
+  opacity: 0.55;
+}
+
+/* Required fields: a red asterisk after the label. */
+.required-mark {
+  color: var(--danger);
+  font-weight: 700;
+}

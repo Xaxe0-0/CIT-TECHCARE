@@ -96,7 +96,11 @@ const FormErrors = createContext<Record<string, string>>({});
 type Control = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
 function inputError(input: Control) {
   if (input.disabled || !input.willValidate) return '';
-  const label = input.labels?.[0]?.querySelector('span')?.textContent || input.name || 'This field';
+  // The label text without the required " *" mark.
+  const label =
+    input.labels?.[0]?.querySelector('span')?.textContent?.replace(/\s*\*$/, '') ||
+    input.name ||
+    'This field';
   // Passwords are never trimmed, including while shown as plain text.
   const value =
     input instanceof HTMLInputElement && input.dataset.password !== undefined
@@ -305,6 +309,15 @@ export function Form({
     </FormErrors.Provider>
   );
 }
+// Marks a required field's label. It sits beside the labelled span (not inside it) so the
+// accessible name stays "Full name"; screen readers hear "required" from the input itself.
+function RequiredMark() {
+  return (
+    <span className="required-mark" aria-hidden="true">
+      {' *'}
+    </span>
+  );
+}
 // Must match newPassword() in backend/src/validations/validation.mjs.
 export const PASSWORD_RULE =
   'At least 12 characters, including an uppercase letter, a lowercase letter, a number, and a symbol such as ! or -.';
@@ -362,7 +375,10 @@ export function Field({
   );
   return (
     <label className="field">
-      <span id={`${id}-label`}>{label}</span>
+      <span>
+        <span id={`${id}-label`}>{label}</span>
+        {required && <RequiredMark />}
+      </span>
       {password ? (
         <span className="password-field">
           {input}
@@ -411,7 +427,10 @@ export function TextArea({
   const { error, id, errorId } = useFieldError(name);
   return (
     <label className="field">
-      <span id={`${id}-label`}>{label}</span>
+      <span>
+        <span id={`${id}-label`}>{label}</span>
+        {required && <RequiredMark />}
+      </span>
       <textarea
         aria-labelledby={`${id}-label`}
         id={id}
@@ -499,7 +518,10 @@ export function Upload({
     <div className="attachment-field">
       <div className="field">
         <label htmlFor={id}>
-          <span id={id + '-label'}>{label}</span>
+          <span>
+            <span id={id + '-label'}>{label}</span>
+            {required && <RequiredMark />}
+          </span>
         </label>
         {compact && (
           <button
