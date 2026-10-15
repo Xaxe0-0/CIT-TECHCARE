@@ -256,11 +256,7 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
             </Link>
             <p>
               New here?{' '}
-              <Link
-                className="auth-link"
-                href={authPaths.register}
-                onClick={() => setMessage('')}
-              >
+              <Link className="auth-link" href={authPaths.register} onClick={() => setMessage('')}>
                 Create an account
               </Link>
             </p>
