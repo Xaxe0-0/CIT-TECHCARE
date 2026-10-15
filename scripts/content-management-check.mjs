@@ -178,7 +178,7 @@ try {
   await dialog
     .getByLabel('Description', { exact: true })
     .fill('Bring your everyday technology questions.');
-  await dialog.getByLabel('Date (optional)', { exact: true }).fill('2027-02-20');
+  await dialog.getByLabel('Date', { exact: true }).fill('2027-02-20');
   await dialog.getByLabel('Venue', { exact: true }).fill('Library lobby');
   await dialog.getByLabel('Hours', { exact: true }).fill('9 AM to 3 PM');
   await dialog.getByLabel('Booth image', { exact: true }).selectOption('campus-building');

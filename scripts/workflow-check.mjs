@@ -175,7 +175,7 @@ try {
   });
   await dialog.getByRole('button', { name: 'Use camera', exact: true }).click();
   await expect(dialog.getByRole('alert')).toContainText('Camera permission was not granted');
-  await expect(dialog.getByRole('button', { name: 'Submit for review' })).toBeEnabled();
+  await expect(dialog.getByRole('button', { name: 'Post my question for review' })).toBeEnabled();
   await expect(dialog.getByLabel('Take photo with device camera')).toHaveAttribute(
     'capture',
     'environment',
@@ -185,7 +185,7 @@ try {
   });
   await dialog.getByRole('button', { name: 'Use camera', exact: true }).click();
   await expect(dialog.getByRole('button', { name: 'Capture photo', exact: true })).toBeEnabled();
-  await expect(dialog.getByRole('button', { name: 'Submit for review' })).toBeDisabled();
+  await expect(dialog.getByRole('button', { name: 'Post my question for review' })).toBeDisabled();
   await member.evaluate(() => {
     window.qaCameraTracks = document.querySelector('.question-camera video').srcObject.getTracks();
   });
@@ -221,7 +221,7 @@ try {
   pass(
     'Photo upload, resize, remove, camera permission fallback, capture/retake/cancel and mobile accessibility',
   );
-  await dialog.getByRole('button', { name: 'Submit for review' }).click();
+  await dialog.getByRole('button', { name: 'Post my question for review' }).click();
   await expect(
     member.locator('.own-question').filter({ hasText: 'How can I make my laptop start faster?' }),
   ).toContainText('pending');
@@ -258,7 +258,7 @@ try {
       'Review the optional startup apps in Task Manager, then apply official Windows updates and restart.',
     );
   await ad
-    .getByLabel('Internal decision note (optional)')
+    .getByLabel('Internal decision note (only staff can see it)')
     .fill('Synthetic browser acceptance check.');
   await ad.getByRole('button', { name: 'Publish question & answer' }).click();
   await expect(admin.getByText('The question queue is clear')).toBeVisible();
@@ -333,7 +333,7 @@ try {
   await dialog
     .getByLabel('Public description')
     .fill('A plain blue laptop sleeve with a fabric handle.');
-  await dialog.getByRole('button', { name: 'Send for review' }).click();
+  await dialog.getByRole('button', { name: 'Post my lost & found notice' }).click();
   await expect(
     member.getByRole('status').filter({ hasText: 'report and photos have been submitted' }),
   ).toBeVisible();

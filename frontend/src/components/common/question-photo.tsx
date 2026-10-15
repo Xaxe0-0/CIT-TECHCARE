@@ -139,9 +139,7 @@ export function QuestionPhoto({ onBusyChange }: { onBusyChange: (busy: boolean) 
 
   return (
     <section className="question-photo" aria-labelledby="question-photo-title">
-      <h3 id="question-photo-title">
-        Add a photo <span>(optional)</span>
-      </h3>
+      <h3 id="question-photo-title">Add a photo</h3>
       <p className="form-hint">
         Show the issue or error message. Hide passwords, faces, and personal details. The photo
         becomes public only if your question is approved.

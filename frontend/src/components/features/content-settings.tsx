@@ -376,7 +376,7 @@ function ContentEditor({ kind, entry, close }: { kind: Kind; entry?: Entry; clos
                   {type === 'video' && (
                     <Field
                       key="video-url"
-                      label="Direct HTTPS video link (optional)"
+                      label="Direct HTTPS video link"
                       name="url"
                       type="url"
                       required={false}
@@ -393,7 +393,7 @@ function ContentEditor({ kind, entry, close }: { kind: Kind; entry?: Entry; clos
                       key={type}
                       label={
                         type === 'video'
-                          ? 'Video upload (optional if using a link)'
+                          ? 'Video upload (not needed if you add a link above)'
                           : 'Image upload'
                       }
                       video={type === 'video'}
@@ -414,7 +414,7 @@ function ContentEditor({ kind, entry, close }: { kind: Kind; entry?: Entry; clos
           )}
           {kind === 'resources' && (
             <>
-              <Upload name="coverFile" label="Cover image (optional)" initial={resource?.cover} />
+              <Upload name="coverFile" label="Cover image" initial={resource?.cover} />
               {resource?.cover && (
                 <label className="checkbox-field">
                   <input type="checkbox" name="removeCover" value="1" /> Remove saved cover
@@ -438,15 +438,9 @@ function ContentEditor({ kind, entry, close }: { kind: Kind; entry?: Entry; clos
                 min={2}
                 max={80}
               />
+              <Field label="Date" name="date" type="date" required={false} value={booth?.date} />
               <Field
-                label="Date (optional)"
-                name="date"
-                type="date"
-                required={false}
-                value={booth?.date}
-              />
-              <Field
-                label="Date note (optional)"
+                label="Date note"
                 name="dateNote"
                 required={false}
                 value={booth?.dateNote}
@@ -474,7 +468,9 @@ function ContentEditor({ kind, entry, close }: { kind: Kind; entry?: Entry; clos
                   ))}
                 </select>
               </label>
-              {!imageChoice && <Upload label="Replacement image (optional)" />}
+              {!imageChoice && (
+                <Upload label="Replacement image (leave empty to keep the current one)" />
+              )}
               <Field
                 label="Image description"
                 name="alt"
@@ -504,7 +500,7 @@ function ContentEditor({ kind, entry, close }: { kind: Kind; entry?: Entry; clos
                 max={2000}
               />
               <TextArea
-                label="Additional note (optional)"
+                label="Additional note"
                 name="note"
                 value={booth?.note ?? defaultBooth.note}
                 required={false}

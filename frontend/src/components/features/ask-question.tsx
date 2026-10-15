@@ -53,7 +53,7 @@ export function AskQuestionPage() {
         <section className="ask-question-form" aria-label="New question">
           <Form
             key={item?.id ?? 'new'}
-            submit={item ? 'Resubmit for review' : 'Submit for review'}
+            submit={item ? 'Save changes and resubmit question' : 'Post my question for review'}
             submitDisabled={photoBusy}
             onSubmit={async (values) => {
               const result = await api<Result>('posts', item ? { ...values, id: item.id } : values);

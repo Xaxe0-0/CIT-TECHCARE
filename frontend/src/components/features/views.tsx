@@ -731,14 +731,14 @@ function Moderation() {
             }}
           >
             <TextArea
-              label="Note to the author (optional)"
+              label="Note to the author (shown to them with your decision)"
               name="note"
               max={500}
               required={false}
               placeholder="What should they change before resubmitting?"
             />
             <TextArea
-              label="Internal decision note (optional)"
+              label="Internal decision note (only staff can see it)"
               name="reason"
               max={500}
               required={false}
@@ -774,7 +774,7 @@ function Moderation() {
           >
             <TextArea label="Your moderator answer" name="answer" min={3} max={1000} />
             <TextArea
-              label="Internal decision note (optional)"
+              label="Internal decision note (only staff can see it)"
               name="reason"
               max={500}
               required={false}

@@ -150,7 +150,7 @@ export function GuideSteps({ guide }: { guide?: Guide }) {
           />
           <Upload
             name={'stepFile' + i}
-            label={'Step ' + (i + 1) + ' image (optional)'}
+            label={'Step ' + (i + 1) + ' image'}
             initial={step.image?.url}
           />
           <Field

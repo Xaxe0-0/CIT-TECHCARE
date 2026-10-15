@@ -536,7 +536,7 @@ function CommentComposer({
         max={1000}
         placeholder="Share a helpful suggestion or attach a photo…"
       />
-      <Upload compact label="Attach an image (optional)" initial={editing?.photo} />
+      <Upload compact label="Attach an image" initial={editing?.photo} />
       {editing?.photo && (
         <label className="checkbox-field">
           <input name="removePhoto" type="checkbox" value="1" /> Remove saved image

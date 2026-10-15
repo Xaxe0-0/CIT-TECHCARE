@@ -215,7 +215,7 @@ export function LostFoundEditor() {
       )}
       <Form
         key={item?.id ?? 'new'}
-        submit={item ? 'Resubmit for review' : 'Send for review'}
+        submit={item ? 'Save changes and resubmit notice' : 'Post my lost & found notice'}
         onSubmit={async (values, progress) => {
           const response = await api<Result>(
             'lost-found',
@@ -240,7 +240,7 @@ export function LostFoundEditor() {
             value={item?.location}
           />
           <Field
-            label="Date lost or found (optional)"
+            label="Date lost or found"
             name="event_date"
             type="date"
             required={false}
@@ -265,7 +265,7 @@ export function LostFoundEditor() {
             </>
           )}
           {Array.from({ length: photos }, (_, i) => (
-            <Upload key={i} name={'photo' + i} label={'Photo ' + (i + 1) + ' (optional)'} />
+            <Upload key={i} name={'photo' + i} label={'Photo ' + (i + 1)} />
           ))}
           {photos < 4 && (
             <button
