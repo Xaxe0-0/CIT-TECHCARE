@@ -7,6 +7,8 @@ import { join, relative, isAbsolute } from 'node:path';
 import { handle } from '../backend/src/controllers/api.mjs';
 import { run, one, now, closeDatabases } from '../backend/src/config/db.mjs';
 import { passwordHash } from '../backend/src/middleware/auth.mjs';
+import { deliverable } from '../backend/src/validations/validation.mjs';
+import { Resolver } from 'node:dns/promises';
 
 const temporary = await mkdtemp(join(tmpdir(), 'techcare-account-'));
 process.env.TECHCARE_DB_DRIVER = 'sqlite';
@@ -337,6 +339,24 @@ try {
     );
     assert.equal((await call('post?id=' + kept)).data.post.name, 'Deleted member');
     assert.equal(await login('member.new@example.test', next), 401);
+  });
+
+  await test('sign-up rejects email domains that cannot receive mail', async (t) => {
+    const answers = {
+      'gmail.com': [{ exchange: 'gmail-smtp-in.l.google.com', priority: 5 }],
+      'example.com': [{ exchange: '', priority: 0 }], // null MX: accepts no mail
+    };
+    t.mock.method(Resolver.prototype, 'resolveMx', async (domain) => {
+      if (domain === 'offline.test')
+        throw Object.assign(new Error('timeout'), { code: 'ETIMEOUT' });
+      if (answers[domain]) return answers[domain];
+      throw Object.assign(new Error('no data'), { code: 'ENODATA' });
+    });
+    assert.equal(await deliverable('ana@gmail.com'), 'ana@gmail.com');
+    await assert.rejects(deliverable('dasdsadsa21321s@dsadasdasd.com'), /cannot receive mail/);
+    await assert.rejects(deliverable('someone@example.com'), /cannot receive mail/);
+    // A DNS outage must not block sign-up; the emailed code still has to arrive.
+    assert.equal(await deliverable('ana@offline.test'), 'ana@offline.test');
   });
 } finally {
   closeDatabases();
