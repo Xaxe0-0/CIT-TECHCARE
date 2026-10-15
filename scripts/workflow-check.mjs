@@ -162,20 +162,20 @@ try {
     .png()
     .toBuffer();
   await dialog
-    .getByLabel('Choose question photo')
+    .getByLabel('Choose question photos')
     .setInputFiles({ name: 'issue.png', mimeType: 'image/png', buffer: photoFixture });
-  await expect(dialog.getByAltText('Selected question photo')).toBeVisible();
+  await expect(dialog.getByAltText('Selected photo 1 of 1')).toBeVisible();
   expect(
-    await dialog.getByAltText('Selected question photo').evaluate((image) => image.naturalWidth),
+    await dialog.getByAltText('Selected photo 1 of 1').evaluate((image) => image.naturalWidth),
   ).toBeLessThanOrEqual(1920);
-  await dialog.getByRole('button', { name: 'Remove photo' }).click();
-  await expect(dialog.getByAltText('Selected question photo')).toHaveCount(0);
+  await dialog.getByRole('button', { name: 'Remove', exact: true }).click();
+  await expect(dialog.getByAltText('Selected photo 1 of 1')).toHaveCount(0);
   await member.evaluate(() => {
     window.qaGetUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
     navigator.mediaDevices.getUserMedia = () =>
       Promise.reject(new DOMException('Denied for test', 'NotAllowedError'));
   });
-  await dialog.getByRole('button', { name: 'Use camera', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Take a photo', exact: true }).click();
   await expect(dialog.getByRole('alert')).toContainText('Camera permission was not granted');
   await expect(dialog.getByRole('button', { name: 'Post my question for review' })).toBeEnabled();
   await expect(dialog.getByLabel('Take photo with device camera')).toHaveAttribute(
@@ -185,14 +185,14 @@ try {
   await member.evaluate(() => {
     navigator.mediaDevices.getUserMedia = window.qaGetUserMedia;
   });
-  await dialog.getByRole('button', { name: 'Use camera', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Take a photo', exact: true }).click();
   await expect(dialog.getByRole('button', { name: 'Capture photo', exact: true })).toBeEnabled();
   await expect(dialog.getByRole('button', { name: 'Post my question for review' })).toBeDisabled();
   await member.evaluate(() => {
     window.qaCameraTracks = document.querySelector('.question-camera video').srcObject.getTracks();
   });
   await dialog.getByRole('button', { name: 'Capture photo', exact: true }).click();
-  await expect(dialog.getByAltText('Selected question photo')).toBeVisible();
+  await expect(dialog.getByAltText('Selected photo 1 of 1')).toBeVisible();
   expect(
     await member.evaluate(() =>
       window.qaCameraTracks.every((track) => track.readyState === 'ended'),
@@ -209,7 +209,7 @@ try {
       window.qaCameraTracks.every((track) => track.readyState === 'ended'),
     ),
   ).toBe(true);
-  await expect(dialog.getByAltText('Selected question photo')).toBeVisible();
+  await expect(dialog.getByAltText('Selected photo 1 of 1')).toBeVisible();
   await member.setViewportSize({ width: 390, height: 844 });
   await member.screenshot({ path: 'artifacts/question-photo-mobile.png' });
   expect(await member.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(
@@ -433,7 +433,10 @@ try {
   await member.getByRole('button', { name: 'Ask a Question', exact: true }).first().click();
   for (let i = 0; i < 12; i++) await member.keyboard.press('Tab');
   expect(await member.evaluate(() => !!document.activeElement.closest('[role=dialog]'))).toBe(true);
-  await member.getByRole('dialog').getByRole('button', { name: 'Use camera', exact: true }).click();
+  await member
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Take a photo', exact: true })
+    .click();
   await expect(
     member.getByRole('dialog').getByRole('button', { name: 'Capture photo', exact: true }),
   ).toBeEnabled();

@@ -36,17 +36,32 @@ export async function savePost(d, me) {
   const title = v.text(d.title, 'Question title', 8, 120),
     body = v.text(d.body, 'Problem description', 20, 2000),
     category = v.choice(d.category, v.categories, 'category');
-  const uploaded = d.photo ? await saveMedia(d.photo, me.id, 'question') : '';
-  const photo = uploaded || (d.removePhoto === '1' ? '' : editing?.photo || '');
+  // Up to four photos (photo0..photo3; photo is the older single-photo field). New photos replace
+  // the saved set and removePhoto clears it. posts.photo keeps the first one as the feed cover.
+  const uploaded = [];
+  try {
+    for (const data of [d.photo, d.photo0, d.photo1, d.photo2, d.photo3]
+      .filter(Boolean)
+      .slice(0, 4))
+      uploaded.push(await saveMedia(data, me.id, 'question'));
+  } catch (error) {
+    for (const url of uploaded) await discardQuestionMedia(url, me.id);
+    throw error;
+  }
+  const saved = JSON.parse(editing?.photos || '[]');
+  const photos = uploaded.length ? uploaded : d.removePhoto === '1' ? [] : saved;
+  const photo = photos[0] || '',
+    photoList = JSON.stringify(photos);
   let id;
   try {
     if (editing) {
       const r = await run(
-        "UPDATE posts SET title=?,body=?,category=?,photo=?,status='pending',review_note='' WHERE id=? AND user_id=? AND status IN ('pending','rejected')",
+        "UPDATE posts SET title=?,body=?,category=?,photo=?,photos=?,status='pending',review_note='' WHERE id=? AND user_id=? AND status IN ('pending','rejected')",
         title,
         body,
         category,
         photo,
+        photoList,
         editing.id,
         me.id,
       );
@@ -56,21 +71,22 @@ export async function savePost(d, me) {
       id = Number(
         (
           await run(
-            'INSERT INTO posts(user_id,title,body,category,created,photo) VALUES(?,?,?,?,?,?)',
+            'INSERT INTO posts(user_id,title,body,category,created,photo,photos) VALUES(?,?,?,?,?,?,?)',
             me.id,
             title,
             body,
             category,
             now(),
             photo,
+            photoList,
           )
         ).lastInsertRowid,
       );
   } catch (error) {
-    if (uploaded) await discardQuestionMedia(uploaded, me.id);
+    for (const url of uploaded) await discardQuestionMedia(url, me.id);
     throw error;
   }
-  if (editing?.photo && editing.photo !== photo) await discardQuestionMedia(editing.photo, me.id);
+  for (const url of saved) if (!photos.includes(url)) await discardQuestionMedia(url, me.id);
   return {
     ok: true,
     id,
@@ -92,7 +108,7 @@ export async function deletePost(d, me) {
     await all("SELECT photo FROM comments WHERE post_id=? AND photo<>''", post.id)
   ).map((row) => row.photo);
   await run('DELETE FROM posts WHERE id=? AND user_id=?', post.id, me.id);
-  if (post.photo) await discardQuestionMedia(post.photo, me.id);
+  for (const url of JSON.parse(post.photos || '[]')) await discardQuestionMedia(url, me.id);
   for (const url of photos) await discardCommunityMedia(url, me.id);
   return { message: 'Question deleted.' };
 }
@@ -351,7 +367,7 @@ export async function communityGet(path, url, me) {
     const row =
       kind === 'post'
         ? await one(
-            'SELECT id,title,body,category,photo,status,review_note FROM posts WHERE id=? AND user_id=?',
+            'SELECT id,title,body,category,photo,photos,status,review_note FROM posts WHERE id=? AND user_id=?',
             id,
             me.id,
           )

@@ -409,7 +409,7 @@ export function DiscussionThread({ id }: { id: number }) {
                 <Badge>{post.category}</Badge>
                 <h1>{post.title}</h1>
                 <p className="discussion-full-body">{post.body}</p>
-                <QuestionImage photo={post.photo} title={post.title} />
+                <QuestionImage photo={post.photo} photos={post.photos} title={post.title} />
                 <div className="discussion-actions">
                   <Votes kind="post" item={post} />
                   <a className="discussion-comments-link" href="#comments">

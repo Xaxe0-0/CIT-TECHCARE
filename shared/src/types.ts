@@ -28,7 +28,9 @@ export type Announcement = {
 };
 export type VoteState = { score: number; myVote: number };
 export type Post = Partial<VoteState> & {
+  // photo is the first (cover) photo; photos lists all of them, as a list or a JSON string.
   photo?: string;
+  photos?: string[] | string;
   id: number;
   title: string;
   body: string;

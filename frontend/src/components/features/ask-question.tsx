@@ -81,10 +81,10 @@ export function AskQuestionPage() {
             />
             {item?.photo && (
               <>
-                <QuestionImage photo={item.photo} title={item.title} />
+                <QuestionImage photo={item.photo} photos={item.photos} title={item.title} />
                 <label className="checkbox-field">
-                  <input type="checkbox" name="removePhoto" value="1" /> Remove the current photo
-                  (adding a new photo also replaces it)
+                  <input type="checkbox" name="removePhoto" value="1" /> Remove the saved photos
+                  (adding new photos also replaces them)
                 </label>
               </>
             )}

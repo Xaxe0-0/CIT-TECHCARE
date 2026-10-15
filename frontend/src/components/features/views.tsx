@@ -571,7 +571,7 @@ function Moderation() {
                     </div>
                     <h2>{p.title}</h2>
                     <p className="preserve-lines">{p.body}</p>
-                    <QuestionImage photo={p.photo} title={p.title} />
+                    <QuestionImage photo={p.photo} photos={p.photos} title={p.title} />
                     <div className="button-row">
                       <button
                         disabled={!!busy}
@@ -775,7 +775,7 @@ function Moderation() {
           <div className="review-context">
             <h3>{answer.title}</h3>
             <p>{answer.body}</p>
-            <QuestionImage photo={answer.photo} title={answer.title} />
+            <QuestionImage photo={answer.photo} photos={answer.photos} title={answer.title} />
           </div>
           <Form
             submit="Publish question & answer"

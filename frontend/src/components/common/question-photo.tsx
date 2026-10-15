@@ -20,8 +20,12 @@ function encodePhoto(source: CanvasImageSource, width: number, height: number) {
   return data;
 }
 
+// Must match the four photos savePost accepts (photo0..photo3).
+const MAX_PHOTOS = 4;
+
 export function QuestionPhoto({ onBusyChange }: { onBusyChange: (busy: boolean) => void }) {
-  const [photo, setPhoto] = useState('');
+  const [photos, setPhotos] = useState<string[]>([]);
+  const full = photos.length >= MAX_PHOTOS;
   const [error, setError] = useState('');
   const [processing, setProcessing] = useState(false);
   const [camera, setCamera] = useState<'off' | 'opening' | 'live'>('off');
@@ -102,7 +106,8 @@ export function QuestionPhoto({ onBusyChange }: { onBusyChange: (busy: boolean) 
   function capture() {
     try {
       const frame = video.current!;
-      setPhoto(encodePhoto(frame, frame.videoWidth, frame.videoHeight));
+      const encoded = encodePhoto(frame, frame.videoWidth, frame.videoHeight);
+      setPhotos((list) => [...list, encoded].slice(0, MAX_PHOTOS));
       setError('');
       stopCamera();
       cameraButton.current?.focus();
@@ -110,22 +115,27 @@ export function QuestionPhoto({ onBusyChange }: { onBusyChange: (busy: boolean) 
       setError((error as Error).message);
     }
   }
-  async function choose(file?: File) {
-    if (!file) return;
+  async function choose(files: File[]) {
+    if (!files.length) return;
     stopCamera();
     const request = ++generation.current;
     setError('');
     setProcessing(true);
     try {
-      if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type))
-        throw new Error('Choose a PNG, JPEG, or WebP photo. Export HEIC photos as JPEG first.');
-      if (file.size > 20000000) throw new Error('Choose an image smaller than 20 MB.');
-      const bitmap = await createImageBitmap(file);
-      try {
-        if (generation.current === request)
-          setPhoto(encodePhoto(bitmap, bitmap.width, bitmap.height));
-      } finally {
-        bitmap.close();
+      if (files.length > MAX_PHOTOS - photos.length)
+        setError(`Only ${MAX_PHOTOS} photos fit; the first ones you chose were added.`);
+      for (const file of files.slice(0, MAX_PHOTOS - photos.length)) {
+        if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type))
+          throw new Error('Choose a PNG, JPEG, or WebP photo. Export HEIC photos as JPEG first.');
+        if (file.size > 20000000) throw new Error('Choose an image smaller than 20 MB.');
+        const bitmap = await createImageBitmap(file);
+        try {
+          if (generation.current !== request) return;
+          const encoded = encodePhoto(bitmap, bitmap.width, bitmap.height);
+          setPhotos((list) => [...list, encoded].slice(0, MAX_PHOTOS));
+        } finally {
+          bitmap.close();
+        }
       }
     } catch (error) {
       if (generation.current === request)
@@ -139,20 +149,23 @@ export function QuestionPhoto({ onBusyChange }: { onBusyChange: (busy: boolean) 
 
   return (
     <section className="question-photo" aria-labelledby="question-photo-title">
-      <h3 id="question-photo-title">Add a photo</h3>
+      <h3 id="question-photo-title">Add photos</h3>
       <p className="form-hint">
-        Show the issue or error message. Hide passwords, faces, and personal details. The photo
-        becomes public only if your question is approved.
+        Up to {MAX_PHOTOS} photos showing the issue or error message. Hide passwords, faces, and
+        personal details. Photos become public only if your question is approved.
       </p>
-      <input type="hidden" name="photo" value={photo} />
+      {photos.map((data, i) => (
+        <input key={i} type="hidden" name={'photo' + i} value={data} />
+      ))}
       <input
         ref={upload}
         type="file"
         accept="image/png,image/jpeg,image/webp"
-        aria-label="Choose question photo"
+        aria-label="Choose question photos"
+        multiple
         hidden
         onChange={(event) => {
-          void choose(event.target.files?.[0]);
+          void choose([...(event.target.files || [])]);
           event.target.value = '';
         }}
       />
@@ -164,7 +177,7 @@ export function QuestionPhoto({ onBusyChange }: { onBusyChange: (busy: boolean) 
         aria-label="Take photo with device camera"
         hidden
         onChange={(event) => {
-          void choose(event.target.files?.[0]);
+          void choose([...(event.target.files || [])]);
           event.target.value = '';
         }}
       />
@@ -172,36 +185,22 @@ export function QuestionPhoto({ onBusyChange }: { onBusyChange: (busy: boolean) 
         <button
           type="button"
           className="button secondary small"
-          disabled={processing || camera !== 'off'}
+          disabled={processing || camera !== 'off' || full}
           onClick={() => upload.current?.click()}
         >
           <ImageSquare size={18} />
-          {photo ? 'Replace photo' : 'Upload photo'}
+          {photos.length ? 'Upload more photos' : 'Upload photos'}
         </button>
         <button
           ref={cameraButton}
           type="button"
           className="button secondary small"
-          disabled={processing || camera !== 'off'}
+          disabled={processing || camera !== 'off' || full}
           onClick={openCamera}
         >
           <Camera size={18} />
-          {photo ? 'Retake photo' : 'Use camera'}
+          {photos.length ? 'Take another photo' : 'Take a photo'}
         </button>
-        {photo && camera === 'off' && (
-          <button
-            type="button"
-            className="button secondary small"
-            disabled={processing}
-            onClick={() => {
-              setPhoto('');
-              setError('');
-            }}
-          >
-            <Trash size={17} />
-            Remove photo
-          </button>
-        )}
       </div>
       {processing && <p role="status">Preparing your photo…</p>}
       {camera !== 'off' && (
@@ -242,11 +241,30 @@ export function QuestionPhoto({ onBusyChange }: { onBusyChange: (busy: boolean) 
           </div>
         </div>
       )}
-      {photo && camera === 'off' && (
-        <figure className="question-photo-preview">
-          <img src={photo} alt="Selected question photo" />
-          <figcaption>Photo attached. Review it before submitting.</figcaption>
-        </figure>
+      {!!photos.length && camera === 'off' && (
+        <ul className="question-photo-previews">
+          {photos.map((data, i) => (
+            <li key={i}>
+              <figure className="question-photo-preview">
+                <img src={data} alt={`Selected photo ${i + 1} of ${photos.length}`} />
+                <figcaption>
+                  Photo {i + 1} of {photos.length}
+                  <button
+                    type="button"
+                    className="text-button"
+                    disabled={processing}
+                    onClick={() => {
+                      setPhotos((list) => list.filter((_, index) => index !== i));
+                      setError('');
+                    }}
+                  >
+                    <Trash size={16} /> Remove
+                  </button>
+                </figcaption>
+              </figure>
+            </li>
+          ))}
+        </ul>
       )}
       {error && (
         <div className="photo-error">
@@ -264,27 +282,45 @@ export function QuestionPhoto({ onBusyChange }: { onBusyChange: (busy: boolean) 
         </div>
       )}
       <p className="form-hint">
-        One PNG, JPEG, or WebP image, up to 20 MB before resizing. Photos are resized for upload.
-        Nothing is uploaded until you submit.
+        {full
+          ? `You have added the maximum of ${MAX_PHOTOS} photos. Remove one to add another.`
+          : 'PNG, JPEG, or WebP images, up to 20 MB each before resizing. Photos are resized for upload, and nothing is uploaded until you submit.'}
       </p>
     </section>
   );
 }
 
-export function QuestionImage({ photo, title }: { photo?: string; title: string }) {
-  if (!photo) return null;
+// Shows every photo of a question (photos: list or JSON string), or a single photo.
+export function QuestionImage({
+  photo,
+  photos,
+  title,
+}: {
+  photo?: string;
+  photos?: string[] | string;
+  title: string;
+}) {
+  const parsed: string[] = typeof photos === 'string' ? JSON.parse(photos || '[]') : photos || [];
+  const list = parsed.length ? parsed : photo ? [photo] : [];
+  if (!list.length) return null;
   return (
-    <a
-      className="question-image"
-      href={photo}
-      target="_blank"
-      rel="noopener noreferrer"
-      aria-label={`Open photo for ${title} in a new tab`}
-    >
-      <img src={photo} alt={`Photo attached to: ${title}`} loading="lazy" />
-      <span className="action-link">
-        <MagnifyingGlassPlus size={18} aria-hidden="true" /> Open full photo
-      </span>
-    </a>
+    <div className={list.length > 1 ? 'question-images' : undefined}>
+      {list.map((url, i) => (
+        <a
+          key={url}
+          className="question-image"
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`Open photo ${i + 1} of ${list.length} for ${title} in a new tab`}
+        >
+          <img src={url} alt={`Photo ${i + 1} attached to: ${title}`} loading="lazy" />
+          <span className="action-link">
+            <MagnifyingGlassPlus size={18} aria-hidden="true" />
+            {list.length > 1 ? `Open photo ${i + 1}` : 'Open full photo'}
+          </span>
+        </a>
+      ))}
+    </div>
   );
 }

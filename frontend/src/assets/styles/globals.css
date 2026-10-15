@@ -4145,3 +4145,30 @@ body {
     height: 36px;
   }
 }
+
+/* Several question photos: a responsive grid, both while choosing and when shown. */
+.question-photo-previews,
+.question-images {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+  margin: 12px 0 20px;
+  padding: 0;
+  list-style: none;
+}
+.question-photo-previews .question-photo-preview {
+  margin: 0;
+}
+.question-photo-previews img {
+  max-height: 180px;
+}
+.question-photo-previews figcaption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+}
+.question-images .question-image {
+  margin: 0;
+}

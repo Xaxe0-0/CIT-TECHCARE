@@ -7,6 +7,13 @@ import { promisify } from 'node:util';
 import { dataDir, one, run, now, transaction, useMySQL } from '../config/db.mjs';
 import { Problem, member } from '../middleware/auth.mjs';
 import { getObject, putObject, removeObject } from './object-storage.mjs';
+
+// SQL condition: the JSON list in `column` contains the next parameter (a media URL; media URLs
+// have no % or _, so MySQL's JSON_SEARCH wildcards never apply).
+const listHas = (column) =>
+  useMySQL()
+    ? `JSON_SEARCH(${column},'one',?) IS NOT NULL`
+    : `EXISTS (SELECT 1 FROM json_each(${column}) j WHERE j.value=?)`;
 const execute = promisify(execFile);
 export async function saveMedia(data, owner, access, video = false, logo = false) {
   if (typeof data !== 'string') throw new Problem('Choose a file to upload.');
@@ -146,7 +153,10 @@ export async function readMedia(name, viewer) {
       throw new Problem('Media not available.', 403);
   }
   if (asset.access === 'question') {
-    const post = await one('SELECT user_id,status FROM posts WHERE photo=?', `/api/media/${name}`);
+    const post = await one(
+      `SELECT user_id,status FROM posts WHERE ${listHas('photos')}`,
+      `/api/media/${name}`,
+    );
     if (
       !post ||
       (post.status !== 'published' &&
@@ -177,7 +187,7 @@ export async function readMedia(name, viewer) {
   }
   if (asset.access === 'lost') {
     const row = await one(
-      `SELECT l.user_id,l.status FROM lost_found l WHERE ${useMySQL() ? "JSON_SEARCH(photos,'one',?) IS NOT NULL" : 'EXISTS (SELECT 1 FROM json_each(l.photos) j WHERE j.value=?)'}`,
+      `SELECT l.user_id,l.status FROM lost_found l WHERE ${listHas('l.photos')}`,
       `/api/media/${name}`,
     );
     if (
@@ -208,7 +218,7 @@ export async function discardQuestionMedia(url, owner) {
   const name = url.replace('/api/media/', '');
   if (!/^[a-f0-9]{40}\.webp$/.test(name)) return;
   // Only remove an unattached upload belonging to this failed submission.
-  if (await one('SELECT 1 FROM posts WHERE photo=?', url)) return;
+  if (await one(`SELECT 1 FROM posts WHERE ${listHas('photos')}`, url)) return;
   const result = await run(
     "DELETE FROM media WHERE name=? AND owner=? AND access='question'",
     name,
@@ -263,7 +273,7 @@ export async function discardCommunityMedia(url, owner) {
   if (!/^[a-f0-9]{40}\.webp$/.test(name)) return;
   if (
     await one(
-      `SELECT 1 FROM comments WHERE photo=? UNION ALL SELECT 1 FROM lost_found WHERE ${useMySQL() ? "JSON_SEARCH(photos,'one',?) IS NOT NULL" : 'EXISTS (SELECT 1 FROM json_each(lost_found.photos) j WHERE j.value=?)'} LIMIT 1`,
+      `SELECT 1 FROM comments WHERE photo=? UNION ALL SELECT 1 FROM lost_found WHERE ${listHas('lost_found.photos')} LIMIT 1`,
       url,
       url,
     )

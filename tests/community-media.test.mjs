@@ -370,6 +370,44 @@ try {
     assert.deepEqual(await ids_('q=stickers&sort=oldest'), [earbuds, charger]);
     assert.deepEqual(await ids_('q=100%25'), [], 'a % is matched literally');
   });
+  await test('questions take several photos, private until approved, replaced and deleted together', async () => {
+    const question = {
+      title: 'Screen flickers at startup',
+      body: 'The screen flickers every time my laptop starts up.',
+      category: 'Hardware',
+    };
+    const asked = await call(
+      'posts',
+      { ...question, photo0: photo, photo1: photo, photo2: photo },
+      sessions.member,
+    );
+    assert.equal(asked.status, 201);
+    const id = asked.data.id,
+      stored = () => one('SELECT photo,photos FROM posts WHERE id=?', id),
+      uploads = (urls) =>
+        urls.map(
+          (url) =>
+            one('SELECT COUNT(*) AS n FROM media WHERE name=?', url.replace('/api/media/', '')).n,
+        );
+    const first = JSON.parse(stored().photos);
+    assert.equal(first.length, 3);
+    assert.equal(stored().photo, first[0], 'the first photo is the feed cover');
+    for (const url of first) {
+      assert.equal((await call(url.replace('/api/', ''), null, sessions.member)).status, 200);
+      assert.equal((await call(url.replace('/api/', ''), null, sessions.other)).status, 403);
+    }
+    // New photos replace the whole saved set and remove the old uploads.
+    await call('posts', { ...question, id, photo0: photo }, sessions.member);
+    const second = JSON.parse(stored().photos);
+    assert.equal(second.length, 1);
+    assert.deepEqual(uploads(first), [0, 0, 0]);
+    // An edit without photos keeps them; deleting the question removes them.
+    await call('posts', { ...question, id }, sessions.member);
+    assert.deepEqual(JSON.parse(stored().photos), second);
+    assert.equal((await call('posts/delete', { id }, sessions.member)).status, 200);
+    assert.deepEqual(uploads(second), [0]);
+  });
+
   await test('content reports are staff-only and removal revokes public access', async () => {
     assert.equal(
       (
