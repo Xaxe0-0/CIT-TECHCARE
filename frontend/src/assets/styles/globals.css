@@ -1923,10 +1923,15 @@ main {
   font-size: 12px;
   margin: 0;
 }
-.auth-links .form {
-  width: 100%;
-  border-top: 1px solid var(--line);
-  padding-top: 18px;
+/* "Send a new code" sits under the code field; the countdown keeps its width steady. */
+.resend-code {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  margin: -4px 0 8px;
+}
+.resend-code button {
+  font-variant-numeric: tabular-nums;
 }
 .demo-note {
   font-size: 11px;
