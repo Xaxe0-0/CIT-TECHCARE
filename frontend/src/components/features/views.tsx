@@ -371,7 +371,9 @@ function Feedback() {
 
 function Profile() {
   const { user, setUser, version, notify, ask } = useTechCare(),
-    [page, setPage] = useState(1);
+    [page, setPage] = useState(1),
+    // Bumped after each save so the picture field forgets the file it just uploaded.
+    [saves, setSaves] = useState(0);
   const result = useData<Dashboard>(`dashboard?page=${page}`, version);
   return (
     <>
@@ -399,6 +401,7 @@ function Profile() {
             onSubmit={async (values) => {
               const r = await api<Result>('profile', values);
               setUser(r.user!);
+              setSaves((n) => n + 1);
               notify('Profile updated.');
             }}
           >
@@ -414,7 +417,7 @@ function Profile() {
               public questions remain visible.
             </p>
             <TextArea label="About me" name="bio" max={400} value={user!.bio} required={false} />
-            <Upload name="picture" label="Profile picture" />
+            <Upload key={saves} name="picture" label="Profile picture" />
           </Form>
           <AccountSettings />
         </section>
