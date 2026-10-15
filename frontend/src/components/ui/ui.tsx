@@ -437,6 +437,80 @@ export function Field({
     </label>
   );
 }
+// Six single-digit boxes for emailed codes. Digits only: typing moves forward, Backspace and the
+// arrow keys move back, and a pasted code (or the phone's one-time-code autofill) fills every box.
+// The six digits are submitted together under `name`, like a normal field.
+export function CodeInput({
+  label,
+  name,
+  initial = '',
+}: {
+  label: string;
+  name: string;
+  initial?: string;
+}) {
+  const { error, id, errorId } = useFieldError(name);
+  const [digits, setDigits] = useState(() =>
+    Array.from({ length: 6 }, (_, i) => initial.replace(/\D/g, '')[i] || ''),
+  );
+  const boxes = useRef<(HTMLInputElement | null)[]>([]);
+  const focus = (i: number) => boxes.current[Math.max(0, Math.min(5, i))]?.focus();
+  function fill(from: number, text: string) {
+    const clean = text.replace(/\D/g, '').slice(0, 6 - from);
+    if (!clean) return;
+    setDigits((current) => {
+      const next = [...current];
+      [...clean].forEach((digit, k) => (next[from + k] = digit));
+      return next;
+    });
+    focus(from + clean.length);
+  }
+  return (
+    <div className="field code-field" role="group" aria-labelledby={`${id}-label`}>
+      <span>
+        <span id={`${id}-label`}>{label}</span>
+        <RequiredMark />
+      </span>
+      <input type="hidden" name={name} value={digits.join('')} />
+      <div className="code-boxes">
+        {digits.map((digit, i) => (
+          <input
+            key={i}
+            ref={(element) => {
+              boxes.current[i] = element;
+            }}
+            aria-label={`Digit ${i + 1} of 6`}
+            aria-invalid={!!error}
+            aria-describedby={error ? errorId : undefined}
+            inputMode="numeric"
+            autoComplete={i === 0 ? 'one-time-code' : 'off'}
+            value={digit}
+            onFocus={(event) => event.currentTarget.select()}
+            onChange={(event) => {
+              const typed = event.target.value.replace(/\D/g, '');
+              if (typed.length > 1) return fill(i, typed);
+              setDigits((current) => current.map((d, k) => (k === i ? typed : d)));
+              if (typed) focus(i + 1);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Backspace' && !digit && i > 0) {
+                event.preventDefault();
+                setDigits((current) => current.map((d, k) => (k === i - 1 ? '' : d)));
+                focus(i - 1);
+              } else if (event.key === 'ArrowLeft') focus(i - 1);
+              else if (event.key === 'ArrowRight') focus(i + 1);
+            }}
+            onPaste={(event) => {
+              event.preventDefault();
+              fill(i, event.clipboardData.getData('text'));
+            }}
+          />
+        ))}
+      </div>
+      <FieldError id={errorId} error={error} />
+    </div>
+  );
+}
 export function TextArea({
   label,
   name,

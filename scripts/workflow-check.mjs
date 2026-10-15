@@ -229,14 +229,14 @@ try {
   ).toContainText('pending');
   pass('Question modal → pending status in dashboard');
   const savedPhoto = await member
-    .getByRole('link', { name: 'View attached photo' })
+    .getByRole('link', { name: 'Photo', exact: true })
     .getAttribute('href');
   expect((await member.request.get(origin + savedPhoto)).status()).toBe(200);
   expect((await fetch(origin + savedPhoto)).status).toBe(403);
   await admin.goto(origin, { waitUntil: 'networkidle' });
   await admin.getByRole('link', { name: 'Sign In', exact: true }).click();
   let ad = admin.locator('.auth-page');
-  await ad.getByLabel('Email address').fill('qa-admin@example.test');
+  await ad.getByLabel('Email address or username').fill('qa-admin@example.test');
   await ad.getByLabel('Password', { exact: true }).fill(password);
   await ad.getByRole('button', { name: 'Sign In', exact: true }).click();
   await admin.getByRole('button', { name: 'Switch to dark mode' }).click();

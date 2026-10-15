@@ -9,6 +9,7 @@ import { run, one, now, closeDatabases } from '../backend/src/config/db.mjs';
 import { passwordHash } from '../backend/src/middleware/auth.mjs';
 import { deliverable } from '../backend/src/validations/validation.mjs';
 import { Resolver } from 'node:dns/promises';
+import { codeEmail } from '../backend/src/services/mail.mjs';
 
 const temporary = await mkdtemp(join(tmpdir(), 'techcare-account-'));
 process.env.TECHCARE_DB_DRIVER = 'sqlite';
@@ -403,6 +404,54 @@ try {
     const members = JSON.stringify((await call('members')).data.members);
     assert.ok(members.includes('"ana_r"') && !members.includes('Ana Reyes Santos'));
     assert.equal((await call('profile', { name: 'ANA_R' }, sessions.other)).status, 409);
+  });
+
+  await test('code emails select in one tap and can open the verify page filled in', () => {
+    const href = 'https://technologycares.tech/verify?email=ana%40uls.edu.ph&code=012345';
+    const mail = codeEmail({
+      subject: 'Verify',
+      heading: 'Verify your email',
+      intro: 'Enter this code.',
+      label: 'Code',
+      code: '012345',
+      note: 'Ignore if not you.',
+      action: { label: 'Verify my email', href },
+    });
+    assert.ok(mail.html.includes('user-select:all'));
+    assert.ok(mail.html.includes(`href="${href.replace('&', '&#38;')}"`));
+    assert.ok(mail.text.includes(href), 'plain-text email carries the link too');
+    assert.ok(
+      !codeEmail({
+        ...mail,
+        code: '1',
+        heading: 'h',
+        intro: 'i',
+        label: 'l',
+        note: 'n',
+      }).html.includes('<a href'),
+    );
+  });
+
+  await test('members sign in with their email address or their username', async () => {
+    const pw2 = 'Strong-enough-pass-1';
+    run(
+      'INSERT INTO users(name,full_name,email,hash,role,verified,created) VALUES(?,?,?,?,?,1,?)',
+      'dual_login',
+      'Dual Login',
+      'dual@example.test',
+      passwordHash(pw2),
+      'member',
+      now(),
+    );
+    const signIn = (login, password = pw2) => call('login', { login, password });
+    assert.equal((await signIn('dual@example.test')).status, 200);
+    assert.equal((await signIn('Dual_Login')).status, 200, 'usernames ignore case');
+    assert.match((await signIn('Dual Login')).data.error, /email address or username/);
+    // Wrong passwords count against the account whichever name is used.
+    assert.equal((await signIn('dual_login', 'Wrong-password-1')).status, 401);
+    assert.equal((await signIn('dual@example.test', 'Wrong-password-2')).status, 401);
+    assert.equal((await signIn('dual_login', 'Wrong-password-3')).status, 429);
+    assert.equal((await signIn('dual@example.test')).status, 429);
   });
 
   await test('three wrong passwords lock sign-in for 15 minutes', async () => {

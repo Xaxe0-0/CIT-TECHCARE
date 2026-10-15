@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Field, Form, Success } from '../ui/ui';
+import { CodeInput, Field, Form, Success } from '../ui/ui';
 import { api } from '@/services/api';
 import { useData } from '@/hooks/use-data';
 import { useTechCare } from '@/context/techcare-context';
@@ -21,6 +21,15 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
     useData<{ emailDomains?: string[] }>(mode === 'register' ? 'settings' : null).data
       ?.emailDomains || [];
   const [now, setNow] = useState(() => Date.now());
+  // The verification email links to /verify?email=…&code=…, which fills the form in one tap.
+  const [linkCode, setLinkCode] = useState('');
+  useEffect(() => {
+    if (mode !== 'verify') return;
+    const query = new URLSearchParams(window.location.search);
+    if (query.get('email')) updateAuthDraft({ email: query.get('email')! });
+    if (/^\d{6}$/.test(query.get('code') || '')) setLinkCode(query.get('code')!);
+    // Read once on arrival; later edits belong to the person.
+  }, [mode]);
   const [resending, setResending] = useState(false);
   const [resendError, setResendError] = useState('');
   const wait = Math.max(0, Math.ceil(RESEND_SECONDS - (now - sentAt) / 1000));
@@ -66,6 +75,8 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
   }
   async function submit(values: FormValues) {
     if (values.email) setEmail(values.email);
+    // Remember an email typed at sign-in so Forgot password / Verify can reuse it.
+    if (values.login?.includes('@')) setEmail(values.login);
     const route = {
       login: 'login',
       register: 'register',
@@ -130,7 +141,7 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
           </div>
         )}
       <Form
-        key={mode}
+        key={mode + linkCode}
         submit={
           {
             login: 'Sign In',
@@ -164,7 +175,17 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
             />
           </>
         )}
-        {mode !== 'reset' && (
+        {mode === 'login' && (
+          <Field
+            label="Email address or username"
+            name="login"
+            max={160}
+            value={email}
+            autoComplete="username"
+            placeholder="e.g. ana_reyes or ana@uls.edu.ph"
+          />
+        )}
+        {!['login', 'reset'].includes(mode) && (
           <Field
             label={
               mode === 'register' && schoolDomains.length ? 'School email address' : 'Email address'
@@ -199,15 +220,7 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
         )}
         {mode === 'verify' && (
           <>
-            <Field
-              label="Six-digit code"
-              name="code"
-              inputMode="numeric"
-              pattern="[0-9]{6}"
-              min={6}
-              max={6}
-              autoComplete="one-time-code"
-            />
+            <CodeInput label="Six-digit code" name="code" initial={linkCode} />
             <div className="resend-code">
               <button
                 type="button"

@@ -601,6 +601,10 @@ async function post(path, d, me, request) {
         label: 'TechCare verification code',
         code,
         note: 'If you did not register, you can ignore this email.',
+        action: {
+          label: 'Verify my email',
+          href: `${process.env.TECHCARE_ORIGIN}/verify?email=${encodeURIComponent(email)}&code=${code}`,
+        },
       }),
       demo,
     );
@@ -676,6 +680,10 @@ async function post(path, d, me, request) {
           label: 'TechCare verification code',
           code,
           note: 'If you did not request this, you can ignore this email.',
+          action: {
+            label: 'Verify my email',
+            href: `${process.env.TECHCARE_ORIGIN}/verify?email=${encodeURIComponent(email)}&code=${code}`,
+          },
         }),
         demo,
       );
@@ -694,11 +702,18 @@ async function post(path, d, me, request) {
     });
   }
   if (path === 'login') {
-    const email = v.email(d.email),
-      password = v.password(d.password),
-      u = await one('SELECT * FROM users WHERE email=?', email);
-    // Three wrong passwords lock the address for 15 minutes; a correct one or a reset clears it.
-    const failKey = `login-fail:${email}`,
+    // Members sign in with their email address or their username (`login`; older clients send
+    // `email`). Anything with an @ is treated as an email.
+    const identifier = String(d.login ?? d.email ?? '').trim(),
+      byEmail = identifier.includes('@'),
+      key = byEmail ? v.email(identifier) : identifier.toLowerCase(),
+      password = v.password(d.password);
+    if (!byEmail && !/^[a-z0-9_]{3,20}$/.test(key))
+      throw new Problem('Enter your email address or username.');
+    const u = await one(`SELECT * FROM users WHERE ${byEmail ? 'email' : 'name'}=?`, key);
+    // Three wrong passwords lock the account for 15 minutes, however it is named; a correct one
+    // or a password reset clears it.
+    const failKey = `login-fail:${u?.email || key}`,
       failures = await one(
         'SELECT count,expires FROM rate_limits WHERE key=? AND expires>?',
         failKey,
@@ -733,7 +748,7 @@ async function post(path, d, me, request) {
       }
       const left = LOGIN_TRIES - count;
       throw new Problem(
-        `Invalid email or password. ${left} ${left === 1 ? 'try' : 'tries'} left before sign-in is locked for 15 minutes.`,
+        `Invalid email, username, or password. ${left} ${left === 1 ? 'try' : 'tries'} left before sign-in is locked for 15 minutes.`,
         401,
       );
     }

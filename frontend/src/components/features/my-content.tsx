@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { Image as ImageIcon } from '@phosphor-icons/react';
 import { useTechCare } from '@/context/techcare-context';
-import { Badge, Empty, Field, Form, date } from '../ui/ui';
+import { Badge, CodeInput, Empty, Field, Form, date } from '../ui/ui';
 import { api } from '@/services/api';
 import type { OwnReport, Post, Result } from '@shared/types';
 
@@ -205,15 +205,7 @@ export function AccountSettings() {
             }}
           >
             {classroom && demoCode && <p className="demo-note">Demo code: {demoCode}</p>}
-            <Field
-              label="Six-digit code from the new address"
-              name="code"
-              inputMode="numeric"
-              pattern="[0-9]{6}"
-              min={6}
-              max={6}
-              autoComplete="one-time-code"
-            />
+            <CodeInput label="Six-digit code from the new address" name="code" />
             <button type="button" className="text-button" onClick={() => setEmailStep('request')}>
               Use a different address
             </button>
