@@ -179,7 +179,7 @@ try {
 
   await test('password changes require the current password and sign out other devices', async () => {
     const second = await login('member@example.test');
-    const next = 'Another-synthetic-password';
+    const next = 'Another-synthetic-password-2';
     assert.equal(
       (
         await call(
@@ -198,10 +198,18 @@ try {
     assert.equal((await call('me', null, second)).data.user, null);
     assert.equal(await login('member@example.test'), 401);
     assert.equal(typeof (await login('member@example.test', next)), 'string');
+    const weak = await call(
+      'account/password',
+      { current: next, password: 'only-lowercase-letters' },
+      sessions.member,
+    );
+    assert.match(weak.data.error, /add an uppercase letter and a number/);
+    const same = await call('account/password', { current: next, password: next }, sessions.member);
+    assert.match(same.data.error, /different from your current one/);
   });
 
   await test('email changes take effect only after the new address confirms a code', async () => {
-    const next = 'Another-synthetic-password';
+    const next = 'Another-synthetic-password-2';
     assert.equal(
       (
         await call(
@@ -260,7 +268,13 @@ try {
     await call('admin/suspend', { id: ids.other, suspended: false }, sessions.admin);
     sessions.other = await login('other@example.test');
     assert.equal(typeof sessions.other, 'string');
-    const log = (await call('admin/audit', null, sessions.admin)).data.entries;
+    const log = (await call('admin/audit?type=staff', null, sessions.admin)).data.entries;
+    // Account and security events have their own filter and never count as staff decisions.
+    const account = (await call('admin/audit?type=account', null, sessions.admin)).data.entries;
+    assert.ok(account.some((e) => e.action === 'sign-in' && e.target === ids.other));
+    assert.ok(account.some((e) => e.action === 'password-changed'));
+    assert.ok(!log.some((e) => e.action === 'sign-in'));
+    assert.equal((await call('admin/audit?type=nonsense', null, sessions.admin)).status, 400);
     assert.deepEqual(
       log.slice(0, 2).map((e) => [e.action, e.target, e.reason]),
       [
@@ -297,32 +311,43 @@ try {
     assert.equal((await call('users.csv', null, sessions.moderator)).status, 403);
     assert.equal((await call('nothing.csv', null, sessions.admin)).status, 404);
     const users = (await call('users.csv', null, sessions.admin)).data;
-    assert.ok(users.startsWith('id,name,email,role')); // text() drops the Excel byte-order mark
+    assert.ok(users.startsWith('id,username,full_name,email,role')); // text() drops the Excel byte-order mark
     assert.ok(users.includes('other@example.test'));
     assert.ok(!/\$2[aby]\$|scrypt|hash/i.test(users), 'password hashes never leave the server');
     for (const name of ['discussions', 'lost-found', 'reports', 'audit'])
       assert.equal((await call(name + '.csv', null, sessions.admin)).status, 200, name);
   });
 
-  await test('members delete their account; personal data goes and public posts remain', async () => {
-    const next = 'Another-synthetic-password';
+  await test('only admins delete accounts; personal data goes and public posts remain', async () => {
+    const next = 'Another-synthetic-password-2';
     const kept = one(
       'SELECT id FROM posts WHERE user_id=? AND status=?',
       ids.member,
       'published',
     ).id;
+    assert.equal((await call('account/delete', { password: next }, sessions.member)).status, 404);
+    for (const session of [sessions.member, sessions.moderator])
+      assert.equal(
+        (await call('admin/delete-account', { id: ids.other }, session)).status,
+        403,
+        'members and moderators cannot delete accounts',
+      );
     assert.equal(
-      (await call('account/delete', { password: 'wrong-password-x' }, sessions.member)).status,
-      400,
-    );
-    assert.equal(
-      (await call('account/delete', { password: pw }, sessions.admin)).status,
+      (await call('admin/delete-account', { id: ids.admin }, sessions.admin)).status,
       403,
       'administrators are protected',
     );
-    const deleted = await call('account/delete', { password: next }, sessions.member);
+    const deleted = await call(
+      'admin/delete-account',
+      { id: ids.member, reason: 'Asked at the booth' },
+      sessions.admin,
+    );
     assert.equal(deleted.status, 200);
-    assert.match(deleted.response.headers.get('set-cookie'), /Max-Age=0/);
+    assert.equal(one('SELECT COUNT(*) AS n FROM sessions WHERE user_id=?', ids.member).n, 0);
+    assert.equal(
+      one("SELECT reason FROM audit WHERE action='delete' AND target=?", ids.member).reason,
+      'Asked at the booth',
+    );
     const u = one('SELECT name,email,bio,verified FROM users WHERE id=?', ids.member);
     assert.deepEqual(
       { ...u },
@@ -339,6 +364,59 @@ try {
     );
     assert.equal((await call('post?id=' + kept)).data.post.name, 'Deleted member');
     assert.equal(await login('member.new@example.test', next), 401);
+  });
+
+  await test('TECHCARE_EMAIL_DOMAINS limits sign-up to school addresses', async (t) => {
+    process.env.TECHCARE_EMAIL_DOMAINS = 'uls.edu.ph';
+    t.after(() => delete process.env.TECHCARE_EMAIL_DOMAINS);
+    const join = (email) =>
+      call('register', {
+        name: 'school_student',
+        full_name: 'School Student',
+        email,
+        password: 'Strong-enough-pass-1',
+      });
+    const outside = await join('student@gmail.com');
+    assert.equal(outside.status, 400);
+    assert.match(outside.data.error, /ending in @uls\.edu\.ph/);
+    assert.equal((await join('student@uls.edu.ph')).status, 201);
+    assert.deepEqual((await call('settings')).data.emailDomains, ['uls.edu.ph']);
+  });
+
+  await test('public names are unique usernames; the full name stays private', async () => {
+    const join = (name, email) =>
+      call('register', {
+        name,
+        full_name: 'Ana Reyes Santos',
+        email,
+        password: 'Strong-enough-pass-1',
+      });
+    assert.match((await join('Ana Reyes', 'ana1@example.test')).data.error, /no spaces/);
+    assert.equal((await join('Ana_R', 'ana2@example.test')).status, 201);
+    const again = await join('ana_r', 'ana3@example.test');
+    assert.equal(again.status, 409, 'usernames are unique regardless of case');
+    assert.deepEqual(
+      { ...one("SELECT name,full_name FROM users WHERE email='ana2@example.test'") },
+      { name: 'ana_r', full_name: 'Ana Reyes Santos' },
+    );
+    run("UPDATE users SET verified=1 WHERE email='ana2@example.test'");
+    const members = JSON.stringify((await call('members')).data.members);
+    assert.ok(members.includes('"ana_r"') && !members.includes('Ana Reyes Santos'));
+    assert.equal((await call('profile', { name: 'ANA_R' }, sessions.other)).status, 409);
+  });
+
+  await test('three wrong passwords lock sign-in for 15 minutes', async () => {
+    const email = 'other@example.test',
+      key = 'login-fail:' + email;
+    assert.equal(await login(email, 'Wrong-password-one'), 401);
+    const second = await call('login', { email, password: 'Wrong-password-two' });
+    assert.match(second.data.error, /1 try left/);
+    assert.equal(await login(email, 'Wrong-password-three'), 429);
+    assert.equal(await login(email), 429, 'even the right password waits for the lock');
+    assert.ok(one('SELECT expires FROM rate_limits WHERE key=?', key).expires - now() > 890);
+    run('UPDATE rate_limits SET expires=? WHERE key=?', now() - 1, key);
+    assert.equal(typeof (await login(email)), 'string', 'the lock ends after 15 minutes');
+    assert.equal(one('SELECT 1 AS x FROM rate_limits WHERE key=?', key), undefined);
   });
 
   await test('sign-up rejects email domains that cannot receive mail', async (t) => {

@@ -51,14 +51,13 @@ export const helpTopics: HelpTopic[] = [
     question: 'How do I delete my account?',
     matches: [/\b(delete|remove|erase|close)\b.*\b(account|data)\b/],
     answer:
-      'You can delete your account yourself from My Dashboard. Your name, email, profile, connections, and private messages are removed; your public questions and comments stay, credited to “Deleted member”. I cannot delete your account for you.',
+      'Accounts are deleted by a TechCare administrator, not from your own dashboard. Your email, profile, connections, and private messages are removed; your public questions and comments stay, credited to “Deleted member”. I cannot delete your account for you.',
     steps: [
-      'Sign in and open My Dashboard.',
-      'Under Account settings, open Delete account and enter your current password.',
-      'Choose Permanently delete my account. This cannot be undone.',
+      'Contact a TechCare administrator or visit the support booth and ask for your account to be deleted.',
+      'The administrator deletes it from the Admin page. This cannot be undone.',
       'Administrator accounts are protected and are removed by the operating team instead.',
     ],
-    link: { href: '/profile', label: 'Open My Dashboard' },
+    link: { href: '/booth', label: 'Find the support booth' },
   },
   {
     id: 'recovery',
@@ -98,10 +97,10 @@ export const helpTopics: HelpTopic[] = [
     question: 'How do I create an account?',
     matches: [/\b(register|registration|signup|sign up|join|create account)\b/, /create.*account/],
     answer:
-      'Choose Create Account at the top of the page. You’ll need a display name, email, and a password of 12–128 characters. Verify your email, then sign in. Your display name appears with your public questions, comments, and replies.',
+      'Choose Create Account at the top of the page. You’ll need your full name (kept private), a username (the only name others see), your school email, and a password of at least 12 characters with an uppercase letter, a lowercase letter, a number, and a symbol. Enter the six-digit code we email you, then sign in.',
     steps: [
       'Select Create Account.',
-      'Fill in Display name, Email address, and Password, then submit.',
+      'Fill in Full name, Username, your school email address, and Password, then submit.',
       'Complete email verification using the six-digit code.',
       'Return to Sign In and use your email and password.',
     ],
@@ -172,7 +171,7 @@ export const helpTopics: HelpTopic[] = [
       /who can (see|read)|hide my|visible to/,
     ],
     answer:
-      'Your display name and published questions, comments, and replies are public. Questions are reviewed before publication; comments appear immediately. A private profile hides your bio and picture except from you and accepted friends. Feedback is staff-only but is not anonymous. This assistant does not inspect your profile or messages; its chat history stays in the tab’s memory.',
+      'Your username and published questions, comments, and replies are public. Questions are reviewed before publication; comments appear immediately. A private profile hides your bio and picture except from you and accepted friends. Feedback is staff-only but is not anonymous. This assistant does not inspect your profile or messages; its chat history stays in the tab’s memory.',
     steps: [
       'Open My Dashboard to change Profile visibility.',
       'Keep passwords, verification codes, and private identifiers out of public posts.',
@@ -184,13 +183,13 @@ export const helpTopics: HelpTopic[] = [
   {
     id: 'profile',
     question: 'How do I edit my profile?',
-    matches: [/\b(profile|dashboard|avatar|picture|bio|display name)\b/],
+    matches: [/\b(profile|dashboard|avatar|picture|bio|display name|username|full name)\b/],
     answer:
-      'Sign in and open My Dashboard to change your display name, profile visibility, bio, and picture. Select Save profile to apply changes.',
+      'Sign in and open My Dashboard to change your username, profile visibility, bio, and picture. Select Save profile to apply changes.',
     steps: [
       'Sign in, then choose My Dashboard in the navigation.',
-      'Edit Display name, Profile visibility, About me, or Profile picture.',
-      'Select Save profile and check the confirmation. A private profile still has a public display name and public approved posts.',
+      'Edit Username, Full name, Profile visibility, About me, or Profile picture.',
+      'Select Save profile and check the confirmation. A private profile still has a public username and public approved posts.',
     ],
     link: { href: '/profile', label: 'Open My Dashboard' },
   },

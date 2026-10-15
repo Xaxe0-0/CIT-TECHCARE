@@ -469,8 +469,9 @@ export function Shell({
         </NavigationDock>
         <div className="sidebar-bottom">
           <div className="sidebar-help">
-            <Heart size={21} weight="regular" />
-            <h3>Need a hand?</h3>
+            <h3>
+              <Heart size={20} weight="regular" aria-hidden="true" /> Need a hand?
+            </h3>
             <Link href="/booth" className="action-link" onClick={() => setMenu(false)}>
               <Users size={18} aria-hidden="true" /> Meet the team
             </Link>
@@ -522,7 +523,7 @@ export function Shell({
               <>
                 <Link href="/profile" className="account-button" aria-label="My dashboard">
                   <Avatar user={user} />
-                  <span>{user.name.split(' ')[0]}</span>
+                  <span>{user.name}</span>
                 </Link>
                 <button
                   className="icon-button"

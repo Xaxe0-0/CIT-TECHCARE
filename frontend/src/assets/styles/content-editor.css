@@ -724,9 +724,10 @@ button.inbox-row:hover,
   gap: 6px;
   min-height: 40px;
   padding: 6px 10px;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.2;
-  white-space: normal;
+  /* Labels stay on one line; .member-grid keeps cards wide enough for "Accept request". */
+  white-space: nowrap;
 }
 :root[data-theme] .member-card .member-actions .member-message {
   grid-column: 1 / -1;
@@ -820,4 +821,19 @@ button.inbox-row:hover,
 }
 .report-form p {
   margin-bottom: 12px;
+}
+
+/* Lost & Found: search and sort sit above the notice-type tabs. */
+.lost-found-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+}
+.lost-found-filters .search-field {
+  flex: 1 1 320px;
+}
+.lost-found-filters .filter-tabs {
+  margin: 0;
 }

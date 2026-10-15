@@ -81,11 +81,11 @@ try {
       `Apply backend/schema/mysql.sql first; target tables are missing: ${missingSchema.join(', ')}.`,
     );
   const [currentVersion] = await connection.execute(
-    'SELECT version FROM migrations WHERE version=9 LIMIT 1',
+    'SELECT version FROM migrations WHERE version=10 LIMIT 1',
   );
   if (!currentVersion.length)
     throw new Error(
-      'The MySQL schema is not at migration version 9. Apply backend/schema/mysql.sql first.',
+      'The MySQL schema is not at migration version 10. Apply backend/schema/mysql.sql first.',
     );
 
   const counts = {};

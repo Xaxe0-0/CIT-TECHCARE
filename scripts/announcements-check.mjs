@@ -151,13 +151,13 @@ try {
   await expect(dialog.getByAltText('Announcement image preview')).toBeVisible();
   await dialog.getByLabel('Title', { exact: true }).fill('Support booth update');
   await dialog
-    .getByLabel('Short description (optional)')
+    .getByLabel('Short description')
     .fill('Planned campus support. Venue and hours to be confirmed.');
   await dialog
     .getByLabel('Image description', { exact: true })
     .fill('Student volunteers at a campus technology booth');
-  await dialog.getByLabel('Event date (optional)').fill('2026-10-16');
-  await dialog.getByLabel('Details link (optional)').fill('https://example.org/details');
+  await dialog.getByLabel('Event date').fill('2026-10-16');
+  await dialog.getByLabel('Details link (starts with https://)').fill('https://example.org/details');
   await scan(admin, 'Announcement editor');
   await admin.screenshot({ path: 'artifacts/announcement-editor.png' });
   await dialog.getByRole('button', { name: 'Save draft' }).click();
@@ -231,7 +231,7 @@ try {
   await scan(admin, 'Admin mobile');
   await first.getByRole('link', { name: 'Edit', exact: true }).click();
   await admin
-    .getByLabel('Replace image (optional)')
+    .getByLabel('Replace image (leave empty to keep the current one)')
     .setInputFiles(resolve('frontend/public/static/device-care-guide.png'));
   await admin
     .locator('.editor-page')

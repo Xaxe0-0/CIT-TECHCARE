@@ -85,8 +85,9 @@ export function EditorFrame({
       <div className="editor-layout">
         <section className="editor-canvas">{children}</section>
         <aside className="editor-notes">
-          <ImageSquare size={32} />
-          <h2>Make it easy to understand.</h2>
+          <h2>
+            <ImageSquare size={24} aria-hidden="true" /> Make it easy to understand.
+          </h2>
           <p>Use a clear title, helpful details, and photos that show what matters.</p>
           <hr />
           <h3>Before you share</h3>
@@ -96,8 +97,13 @@ export function EditorFrame({
           </p>
           <p className="muted">
             Images: up to 3 MB each.
-            <br />
-            Videos: MP4 or WebM, up to 20 MB.
+            {/* Only staff content editors take videos; Lost & Found notices are photos only. */}
+            {back !== '/lostfound' && (
+              <>
+                <br />
+                Videos: MP4 or WebM, up to 20 MB.
+              </>
+            )}
           </p>
         </aside>
       </div>
@@ -150,7 +156,7 @@ export function GuideSteps({ guide }: { guide?: Guide }) {
           />
           <Upload
             name={'stepFile' + i}
-            label={'Step ' + (i + 1) + ' image (optional)'}
+            label={'Step ' + (i + 1) + ' image'}
             initial={step.image?.url}
           />
           <Field

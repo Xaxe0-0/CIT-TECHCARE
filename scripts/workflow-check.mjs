@@ -104,26 +104,28 @@ try {
   await expect(member.getByRole('dialog')).toHaveCount(0);
   let dialog = member.locator('.auth-page');
   await dialog.getByRole('button', { name: 'Create Account', exact: true }).click();
-  await expect(dialog.getByLabel('Display name', { exact: true })).toBeFocused();
-  await expect(dialog.getByText('Please enter display name.', { exact: true })).toBeVisible();
+  await expect(dialog.getByLabel('Full name', { exact: true })).toBeFocused();
+  await expect(dialog.getByText('Please enter full name.', { exact: true })).toBeVisible();
   await dialog.getByLabel('Email address', { exact: true }).fill('incorrect');
-  await dialog.getByLabel('Password (12 to 128 characters)', { exact: true }).fill('short');
+  await dialog.getByLabel('Password', { exact: true }).fill('short');
   await dialog.getByRole('button', { name: 'Create Account', exact: true }).click();
   await expect(
     dialog.getByText('Enter a valid email address, such as name@example.com.'),
   ).toBeVisible();
-  await expect(
-    dialog.getByLabel('Password (12 to 128 characters)', { exact: true }),
-  ).toHaveAttribute('aria-invalid', 'true');
+  await expect(dialog.getByLabel('Password', { exact: true })).toHaveAttribute(
+    'aria-invalid',
+    'true',
+  );
   await member.screenshot({ path: 'artifacts/custom-input-errors-dark.png' });
   const errorScan = await new AxeBuilder({ page: member })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
     .analyze();
   expect(errorScan.violations).toEqual([]);
   pass('Custom required/email/length errors, accessible labels and first-error focus');
-  await dialog.getByLabel('Display name').fill('QA Student');
+  await dialog.getByLabel('Full name').fill('QA Student');
+  await dialog.getByLabel('Username').fill('qa_student');
   await dialog.getByLabel('Email address').fill('qa-student@example.test');
-  await dialog.getByLabel('Password (12 to 128 characters)', { exact: true }).fill(password);
+  await dialog.getByLabel('Password', { exact: true }).fill(password);
   await dialog.getByRole('button', { name: 'Create Account', exact: true }).click();
   await expect(dialog.getByRole('heading', { name: 'Verify Your Email' })).toBeVisible();
   await expect(member).toHaveURL(origin + '/verify');
@@ -160,22 +162,22 @@ try {
     .png()
     .toBuffer();
   await dialog
-    .getByLabel('Choose question photo')
+    .getByLabel('Choose question photos')
     .setInputFiles({ name: 'issue.png', mimeType: 'image/png', buffer: photoFixture });
-  await expect(dialog.getByAltText('Selected question photo')).toBeVisible();
+  await expect(dialog.getByAltText('Selected photo 1 of 1')).toBeVisible();
   expect(
-    await dialog.getByAltText('Selected question photo').evaluate((image) => image.naturalWidth),
+    await dialog.getByAltText('Selected photo 1 of 1').evaluate((image) => image.naturalWidth),
   ).toBeLessThanOrEqual(1920);
-  await dialog.getByRole('button', { name: 'Remove photo' }).click();
-  await expect(dialog.getByAltText('Selected question photo')).toHaveCount(0);
+  await dialog.getByRole('button', { name: 'Remove', exact: true }).click();
+  await expect(dialog.getByAltText('Selected photo 1 of 1')).toHaveCount(0);
   await member.evaluate(() => {
     window.qaGetUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
     navigator.mediaDevices.getUserMedia = () =>
       Promise.reject(new DOMException('Denied for test', 'NotAllowedError'));
   });
-  await dialog.getByRole('button', { name: 'Use camera', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Take a photo', exact: true }).click();
   await expect(dialog.getByRole('alert')).toContainText('Camera permission was not granted');
-  await expect(dialog.getByRole('button', { name: 'Submit for review' })).toBeEnabled();
+  await expect(dialog.getByRole('button', { name: 'Post my question for review' })).toBeEnabled();
   await expect(dialog.getByLabel('Take photo with device camera')).toHaveAttribute(
     'capture',
     'environment',
@@ -183,14 +185,14 @@ try {
   await member.evaluate(() => {
     navigator.mediaDevices.getUserMedia = window.qaGetUserMedia;
   });
-  await dialog.getByRole('button', { name: 'Use camera', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Take a photo', exact: true }).click();
   await expect(dialog.getByRole('button', { name: 'Capture photo', exact: true })).toBeEnabled();
-  await expect(dialog.getByRole('button', { name: 'Submit for review' })).toBeDisabled();
+  await expect(dialog.getByRole('button', { name: 'Post my question for review' })).toBeDisabled();
   await member.evaluate(() => {
     window.qaCameraTracks = document.querySelector('.question-camera video').srcObject.getTracks();
   });
   await dialog.getByRole('button', { name: 'Capture photo', exact: true }).click();
-  await expect(dialog.getByAltText('Selected question photo')).toBeVisible();
+  await expect(dialog.getByAltText('Selected photo 1 of 1')).toBeVisible();
   expect(
     await member.evaluate(() =>
       window.qaCameraTracks.every((track) => track.readyState === 'ended'),
@@ -207,7 +209,7 @@ try {
       window.qaCameraTracks.every((track) => track.readyState === 'ended'),
     ),
   ).toBe(true);
-  await expect(dialog.getByAltText('Selected question photo')).toBeVisible();
+  await expect(dialog.getByAltText('Selected photo 1 of 1')).toBeVisible();
   await member.setViewportSize({ width: 390, height: 844 });
   await member.screenshot({ path: 'artifacts/question-photo-mobile.png' });
   expect(await member.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(
@@ -221,7 +223,7 @@ try {
   pass(
     'Photo upload, resize, remove, camera permission fallback, capture/retake/cancel and mobile accessibility',
   );
-  await dialog.getByRole('button', { name: 'Submit for review' }).click();
+  await dialog.getByRole('button', { name: 'Post my question for review' }).click();
   await expect(
     member.locator('.own-question').filter({ hasText: 'How can I make my laptop start faster?' }),
   ).toContainText('pending');
@@ -258,7 +260,7 @@ try {
       'Review the optional startup apps in Task Manager, then apply official Windows updates and restart.',
     );
   await ad
-    .getByLabel('Internal decision note (optional)')
+    .getByLabel('Internal decision note (only staff can see it)')
     .fill('Synthetic browser acceptance check.');
   await ad.getByRole('button', { name: 'Publish question & answer' }).click();
   await expect(admin.getByText('The question queue is clear')).toBeVisible();
@@ -333,7 +335,7 @@ try {
   await dialog
     .getByLabel('Public description')
     .fill('A plain blue laptop sleeve with a fabric handle.');
-  await dialog.getByRole('button', { name: 'Send for review' }).click();
+  await dialog.getByRole('button', { name: 'Post my lost & found notice' }).click();
   await expect(
     member.getByRole('status').filter({ hasText: 'report and photos have been submitted' }),
   ).toBeVisible();
@@ -431,7 +433,10 @@ try {
   await member.getByRole('button', { name: 'Ask a Question', exact: true }).first().click();
   for (let i = 0; i < 12; i++) await member.keyboard.press('Tab');
   expect(await member.evaluate(() => !!document.activeElement.closest('[role=dialog]'))).toBe(true);
-  await member.getByRole('dialog').getByRole('button', { name: 'Use camera', exact: true }).click();
+  await member
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Take a photo', exact: true })
+    .click();
   await expect(
     member.getByRole('dialog').getByRole('button', { name: 'Capture photo', exact: true }),
   ).toBeEnabled();

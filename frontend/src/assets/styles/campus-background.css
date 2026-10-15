@@ -289,7 +289,6 @@ body {
 .assistant-footer .action-link,
 .assistant-message .action-link,
 .sidebar-help .action-link,
-.question-image .action-link,
 .resource-link-preview .action-link {
   display: inline-flex;
   align-items: center;

@@ -28,6 +28,21 @@ export function email(value) {
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) throw new Problem('Enter a valid email address.');
   return v;
 }
+// TECHCARE_EMAIL_DOMAINS (comma-separated, e.g. "uls.edu.ph") limits new sign-ups and email
+// changes to those domains; empty allows any domain that can receive mail.
+export const allowedEmailDomains = () =>
+  (process.env.TECHCARE_EMAIL_DOMAINS || '')
+    .split(',')
+    .map((domain) => domain.trim().toLowerCase().replace(/^@/, ''))
+    .filter(Boolean);
+export function allowedEmail(email) {
+  const domains = allowedEmailDomains();
+  if (domains.length && !domains.includes(email.slice(email.lastIndexOf('@') + 1)))
+    throw new Problem(
+      `Use your school email address ending in ${domains.map((d) => '@' + d).join(' or ')}.`,
+    );
+  return email;
+}
 const resolver = new Resolver({ timeout: 3000, tries: 2 });
 // Rejects addresses whose domain cannot receive mail: no MX record (made-up domains such as
 // "dsadasdasd.com") or a "null MX" that refuses all mail. A DNS outage lets the address
@@ -41,6 +56,30 @@ export async function deliverable(email) {
     if (!['ENOTFOUND', 'ENODATA'].includes(error.code)) return email;
   }
   throw new Problem('This email address cannot receive mail. Check it for typos.');
+}
+// New or changed passwords. Sign-in keeps using password() so older passwords still work.
+export function newPassword(value) {
+  const v = password(value);
+  const missing = [
+    [/[a-z]/, 'a lowercase letter'],
+    [/[A-Z]/, 'an uppercase letter'],
+    [/[0-9]/, 'a number'],
+    [/[^A-Za-z0-9]/, 'a symbol such as ! or -'],
+  ]
+    .filter(([pattern]) => !pattern.test(v))
+    .map(([, label]) => label);
+  if (missing.length)
+    throw new Problem(
+      `Make your password stronger: add ${missing.join(', ').replace(/, ([^,]*)$/, ' and $1')}.`,
+    );
+  return v;
+}
+// Public usernames (users.name): stored lowercase, so uniqueness ignores case.
+export function username(value) {
+  const v = text(value, 'Username', 3, 20).toLowerCase();
+  if (!/^[a-z0-9_]+$/.test(v))
+    throw new Problem('Usernames use 3 to 20 letters, numbers, or underscores, with no spaces.');
+  return v;
 }
 export function password(value) {
   if (typeof value !== 'string' || value.length < 12 || value.length > 128)

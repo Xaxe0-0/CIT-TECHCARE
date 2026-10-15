@@ -33,11 +33,45 @@ export async function setSuspended(d, me) {
   };
 }
 
+// The activity log holds staff decisions, account and security events, and member posts.
+export const logActivity = (actorId, action, kind, target, reason = '') =>
+  run(
+    'INSERT INTO audit(actor,action,kind,target,reason,created) VALUES(?,?,?,?,?,?)',
+    actorId,
+    action,
+    kind,
+    target,
+    reason,
+    now(),
+  );
+const accountActions = [
+  'sign-up',
+  'email-verified',
+  'sign-in',
+  'sign-in-locked',
+  'password-changed',
+  'password-reset',
+  'email-changed',
+  'profile-updated',
+];
+const memberActions = ['question-posted', 'question-edited', 'comment-posted', 'notice-posted'];
 export async function auditLog(url, me) {
   requireUser(me, ['admin']);
   const page = v.page(url);
+  // type=account | activity | staff narrows the log; anything else that is not staff is excluded
+  // from "staff" so new member events never show up as staff decisions.
+  const type = url.searchParams.get('type') || '';
+  if (type) v.choice(type, ['account', 'activity', 'staff'], 'log filter');
+  const listed = type === 'account' ? accountActions : type === 'activity' ? memberActions : [];
+  const known = [...accountActions, ...memberActions];
+  const where = !type
+    ? ''
+    : type === 'staff'
+      ? `WHERE a.action NOT IN (${known.map(() => '?').join(',')})`
+      : `WHERE a.action IN (${listed.map(() => '?').join(',')})`;
   const rows = await all(
-    `SELECT a.id,a.action,a.kind,a.target,a.reason,a.created,u.name FROM audit a JOIN users u ON u.id=a.actor ORDER BY a.id DESC LIMIT 21 OFFSET ${page.offset}`,
+    `SELECT a.id,a.action,a.kind,a.target,a.reason,a.created,u.name FROM audit a JOIN users u ON u.id=a.actor ${where} ORDER BY a.id DESC LIMIT 21 OFFSET ${page.offset}`,
+    ...(type === 'staff' ? known : listed),
   );
   return { entries: rows.slice(0, 20), page: page.number, hasMore: rows.length > 20 };
 }
@@ -89,13 +123,16 @@ const exportsByName = {
   },
   users: {
     roles: ['admin'],
-    header: 'id,name,email,role,verified,suspended,joined',
+    header: 'id,username,full_name,email,role,verified,suspended,joined',
     rows: async () =>
       (
-        await all('SELECT id,name,email,role,verified,suspended,created FROM users ORDER BY id')
+        await all(
+          'SELECT id,name,full_name,email,role,verified,suspended,created FROM users ORDER BY id',
+        )
       ).map((r) => [
         r.id,
         r.name,
+        r.full_name,
         r.email,
         r.role,
         yes(r.verified),

@@ -13,6 +13,7 @@ import {
 import * as v from '../validations/validation.mjs';
 import { sendMail, codeEmail } from './mail.mjs';
 import { discardProfileMedia } from './media.mjs';
+import { logActivity } from './admin-tools.mjs';
 
 // Every account change re-checks the password and shares one per-account attempt limit.
 async function confirmPassword(me, password) {
@@ -24,9 +25,13 @@ async function confirmPassword(me, password) {
 export async function changePassword(d, me, request) {
   requireUser(me);
   await confirmPassword(me, d.current);
-  const hash = passwordHash(v.password(d.password));
+  const password = v.newPassword(d.password);
+  if (passwordOK(password, me.hash))
+    throw new Problem('Choose a new password that is different from your current one.');
+  const hash = passwordHash(password);
   await transaction(async () => {
     await run('UPDATE users SET hash=? WHERE id=?', hash, me.id);
+    await logActivity(me.id, 'password-changed', 'user', me.id);
     await run('DELETE FROM password_resets WHERE user_id=?', me.id);
     await run(
       'DELETE FROM sessions WHERE user_id=? AND token_hash<>?',
@@ -40,7 +45,7 @@ export async function changePassword(d, me, request) {
 export async function requestEmailChange(d, me, demo) {
   requireUser(me);
   await confirmPassword(me, d.password);
-  const email = v.email(d.email);
+  const email = v.allowedEmail(v.email(d.email));
   if (email === me.email) throw new Problem('This is already your account email.');
   if (await one('SELECT id FROM users WHERE email=?', email))
     throw new Problem('This email cannot be used. Try another address.', 409);
@@ -85,6 +90,7 @@ export async function confirmEmailChange(d, me) {
   }
   await transaction(async () => {
     await run('UPDATE users SET email=? WHERE id=?', change.email, me.id);
+    await logActivity(me.id, 'email-changed', 'user', me.id);
     await run('DELETE FROM email_changes WHERE user_id=?', me.id);
   });
   return {
@@ -94,15 +100,19 @@ export async function confirmEmailChange(d, me) {
 }
 
 // Removes personal data and access. Public questions and comments stay, credited to "Deleted member".
-export async function deleteAccount(d, me) {
-  requireUser(me);
-  await confirmPassword(me, d.password);
-  if (me.role === 'admin')
+// Members cannot delete their own account; they ask an administrator, who deletes it here.
+// Personal data goes, public posts stay credited to "Deleted member". Administrators are protected.
+export async function deleteMember(d, me) {
+  requireUser(me, ['admin']);
+  const id = v.id(d.id),
+    reason = v.text(d.reason || '', 'Reason', 0, 500);
+  const target = await one('SELECT id,role,avatar FROM users WHERE id=?', id);
+  if (!target) throw new Problem('Account not found.', 404);
+  if (target.role === 'admin')
     throw new Problem(
       'Administrator accounts are protected. Use the approved operator procedure.',
       403,
     );
-  const id = me.id;
   await transaction(async () => {
     await run(
       "UPDATE users SET name='Deleted member',email=?,hash='!',bio='',avatar='',visibility='private',verified=0,role='member' WHERE id=?",
@@ -127,7 +137,14 @@ export async function deleteAccount(d, me) {
       id,
       id,
     );
+    await run(
+      "INSERT INTO audit(actor,action,kind,target,reason,created) VALUES(?,'delete','user',?,?,?)",
+      me.id,
+      id,
+      reason,
+      now(),
+    );
   });
-  if (me.avatar) await discardProfileMedia(me.avatar, id);
-  return { message: 'Your account has been deleted.' };
+  if (target.avatar) await discardProfileMedia(target.avatar, id);
+  return { message: 'The account has been deleted.' };
 }

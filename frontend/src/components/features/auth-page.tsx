@@ -2,8 +2,9 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Field, Form, Success } from '../ui/ui';
+import { Field, Form, PASSWORD_RULE, Success } from '../ui/ui';
 import { api } from '@/services/api';
+import { useData } from '@/hooks/use-data';
 import { useTechCare } from '@/context/techcare-context';
 import { authPaths, type AuthMode } from '@/utils/auth-pages';
 import type { Result, FormValues } from '@shared/types';
@@ -15,6 +16,10 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
   const { setUser, notify, classroom, authDraft, updateAuthDraft } = useTechCare(),
     router = useRouter();
   const { email, code, token, message, sentAt } = authDraft;
+  // Set when the server limits sign-ups to school email domains (TECHCARE_EMAIL_DOMAINS).
+  const schoolDomains =
+    useData<{ emailDomains?: string[] }>(mode === 'register' ? 'settings' : null).data
+      ?.emailDomains || [];
   const [now, setNow] = useState(() => Date.now());
   const [resending, setResending] = useState(false);
   const [resendError, setResendError] = useState('');
@@ -138,21 +143,53 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
         onSubmit={submit}
       >
         {mode === 'register' && (
-          <Field label="Display name" name="name" min={2} max={80} autoComplete="name" />
+          <>
+            <Field
+              label="Full name"
+              name="full_name"
+              min={2}
+              max={80}
+              autoComplete="name"
+              hint="Kept private: only you and TechCare administrators can see it."
+            />
+            <Field
+              label="Username"
+              name="name"
+              min={3}
+              max={20}
+              pattern="[A-Za-z0-9_]{3,20}"
+              autoComplete="username"
+              placeholder="e.g. ana_reyes"
+              hint="3 to 20 letters, numbers, or underscores, with no spaces. This is the only name other members see."
+            />
+          </>
         )}
         {mode !== 'reset' && (
           <Field
-            label="Email address"
+            label={
+              mode === 'register' && schoolDomains.length ? 'School email address' : 'Email address'
+            }
             name="email"
             type="email"
             max={160}
             value={email}
             autoComplete="email"
+            placeholder={
+              mode === 'register' && schoolDomains.length
+                ? `yourname@${schoolDomains[0]}`
+                : undefined
+            }
+            hint={
+              mode === 'register' && schoolDomains.length
+                ? `Only ${schoolDomains.map((domain) => '@' + domain).join(' or ')} addresses can join TechCare.`
+                : undefined
+            }
           />
         )}
         {['login', 'register', 'reset'].includes(mode) && (
           <Field
-            label={mode === 'login' ? 'Password' : 'Password (12 to 128 characters)'}
+            label={mode === 'reset' ? 'New password' : 'Password'}
+            hint={mode === 'login' ? undefined : PASSWORD_RULE}
             name="password"
             type="password"
             min={12}
@@ -203,41 +240,40 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
         )}
         {mode === 'register' && (
           <p className="form-hint">
-            Your display name appears with your public questions, comments, and replies. Please read
-            our <Link href="/privacy">privacy and community guidelines</Link>.
+            Your username appears with your public questions, comments, and replies. Please read our{' '}
+            <Link href="/privacy">privacy and community guidelines</Link>.
           </p>
         )}
       </Form>
       <div className="auth-links">
         {mode === 'login' ? (
           <>
-            <Link className="text-button" href={authPaths.forgot} onClick={() => setMessage('')}>
+            <Link className="auth-link" href={authPaths.forgot} onClick={() => setMessage('')}>
               Forgot password?
             </Link>
-            <Link className="text-button" href={authPaths.verify} onClick={() => setMessage('')}>
+            <Link className="auth-link" href={authPaths.verify} onClick={() => setMessage('')}>
               Verify a pending account
             </Link>
             <p>
               New here?{' '}
-              <Link
-                className="text-button"
-                href={authPaths.register}
-                onClick={() => setMessage('')}
-              >
-                Create Account
+              <Link className="auth-link" href={authPaths.register} onClick={() => setMessage('')}>
+                Create an account
               </Link>
             </p>
           </>
         ) : (
           <>
-            <Link className="text-button" href={authPaths.login} onClick={() => setMessage('')}>
-              Back to Sign In
-            </Link>
             {mode === 'forgot' && (
-              <Link className="text-button" href={authPaths.reset} onClick={() => setMessage('')}>
-                Reset password with a token
+              <Link className="auth-link" href={authPaths.reset} onClick={() => setMessage('')}>
+                Already have a token? Reset your password
               </Link>
             )}
+            <p>
+              {mode === 'register' ? 'Already have an account? ' : 'Remembered it? '}
+              <Link className="auth-link" href={authPaths.login} onClick={() => setMessage('')}>
+                Sign in
+              </Link>
+            </p>
           </>
         )}
       </div>

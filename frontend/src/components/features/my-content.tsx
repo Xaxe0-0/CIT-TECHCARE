@@ -1,10 +1,9 @@
 'use client';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Image as ImageIcon } from '@phosphor-icons/react';
 import { useTechCare } from '@/context/techcare-context';
-import { Badge, Empty, Field, Form, date } from '../ui/ui';
+import { Badge, Empty, Field, Form, PASSWORD_RULE, date } from '../ui/ui';
 import { api } from '@/services/api';
 import type { OwnReport, Post, Result } from '@shared/types';
 
@@ -63,11 +62,6 @@ export function MyQuestion({ post: p, changed }: { post: Post; changed: () => vo
       <div>
         <h3>{p.title}</h3>
         <small>{date(p.created)}</small>
-        {p.photo && (
-          <a className="action-link" href={p.photo} target="_blank" rel="noopener noreferrer">
-            <ImageIcon size={18} aria-hidden="true" /> View attached photo
-          </a>
-        )}
         <ReviewNote status={p.status} note={p.review_note} />
         <div className="own-actions">
           {p.status === 'published' ? (
@@ -78,6 +72,11 @@ export function MyQuestion({ post: p, changed }: { post: Post; changed: () => vo
             <Link className="text-button" href={'/discussion/ask?edit=' + p.id}>
               {p.status === 'rejected' ? 'Edit & resubmit' : 'Edit'}
             </Link>
+          )}
+          {p.photo && (
+            <a className="text-button" href={p.photo} target="_blank" rel="noopener noreferrer">
+              <ImageIcon size={18} aria-hidden="true" /> Photo
+            </a>
           )}
           <DeleteButton label="question" path="posts/delete" id={p.id} done={changed} />
         </div>
@@ -130,7 +129,6 @@ export function MyReports({ reports, changed }: { reports: OwnReport[]; changed:
 
 export function AccountSettings() {
   const { user, setUser, notify, classroom } = useTechCare();
-  const router = useRouter();
   const [emailStep, setEmailStep] = useState<'request' | 'confirm'>('request');
   const [demoCode, setDemoCode] = useState('');
   return (
@@ -154,7 +152,8 @@ export function AccountSettings() {
             autoComplete="current-password"
           />
           <Field
-            label="New password (12 to 128 characters)"
+            label="New password"
+            hint={PASSWORD_RULE}
             name="password"
             type="password"
             min={12}
@@ -221,36 +220,11 @@ export function AccountSettings() {
           </Form>
         )}
       </details>
-      <details>
-        <summary>Delete account</summary>
-        {user?.role === 'admin' ? (
-          <p className="form-hint">
-            Administrator accounts are protected. Use the approved operator procedure.
-          </p>
-        ) : (
-          <Form
-            submit="Permanently delete my account"
-            onSubmit={async (values) => {
-              const r = await api<Result>('account/delete', values);
-              setUser(null);
-              router.push('/');
-              notify(r.message!);
-            }}
-          >
-            <p>
-              This removes your name, email, profile, connections, and private messages. Your public
-              questions and comments stay, credited to “Deleted member”. This cannot be undone.
-            </p>
-            <Field
-              label="Current password"
-              name="password"
-              type="password"
-              max={128}
-              autoComplete="current-password"
-            />
-          </Form>
-        )}
-      </details>
+      <p className="form-hint">
+        To close your account, ask a TechCare administrator. They remove your email, profile,
+        connections, and private messages; your public questions and comments stay, credited to
+        “Deleted member”.
+      </p>
     </section>
   );
 }

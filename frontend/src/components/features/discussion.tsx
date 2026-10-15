@@ -409,7 +409,7 @@ export function DiscussionThread({ id }: { id: number }) {
                 <Badge>{post.category}</Badge>
                 <h1>{post.title}</h1>
                 <p className="discussion-full-body">{post.body}</p>
-                <QuestionImage photo={post.photo} title={post.title} />
+                <QuestionImage photo={post.photo} photos={post.photos} title={post.title} />
                 <div className="discussion-actions">
                   <Votes kind="post" item={post} />
                   <a className="discussion-comments-link" href="#comments">
@@ -536,7 +536,7 @@ function CommentComposer({
         max={1000}
         placeholder="Share a helpful suggestion or attach a photo…"
       />
-      <Upload compact label="Attach an image (optional)" initial={editing?.photo} />
+      <Upload compact label="Attach an image" initial={editing?.photo} />
       {editing?.photo && (
         <label className="checkbox-field">
           <input name="removePhoto" type="checkbox" value="1" /> Remove saved image

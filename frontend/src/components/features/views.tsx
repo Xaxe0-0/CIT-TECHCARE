@@ -359,7 +359,7 @@ function Feedback() {
           <LockKey size={29} weight="regular" />
           <h3>Shared privately with the team</h3>
           <p>
-            Your feedback and display name are visible only to moderators and administrators for
+            Your feedback and username are visible only to moderators and administrators for
             evaluation and follow-up.
           </p>
           <p>It is not posted publicly and is not anonymous.</p>
@@ -371,12 +371,14 @@ function Feedback() {
 
 function Profile() {
   const { user, setUser, version, notify, ask } = useTechCare(),
-    [page, setPage] = useState(1);
+    [page, setPage] = useState(1),
+    // Bumped after each save so the picture field forgets the file it just uploaded.
+    [saves, setSaves] = useState(0);
   const result = useData<Dashboard>(`dashboard?page=${page}`, version);
   return (
     <>
       <PageHeading
-        title={`Welcome back, ${user!.name.split(' ')[0]}`}
+        title={`Welcome back, ${(user!.full_name || user!.name).split(' ')[0]}`}
         description="Your profile, your connections, and the questions you’re working through."
         action={
           <button className="button primary" onClick={ask}>
@@ -399,10 +401,27 @@ function Profile() {
             onSubmit={async (values) => {
               const r = await api<Result>('profile', values);
               setUser(r.user!);
+              setSaves((n) => n + 1);
               notify('Profile updated.');
             }}
           >
-            <Field label="Display name" name="name" min={2} max={80} value={user!.name} />
+            <Field
+              label="Username"
+              name="name"
+              min={3}
+              max={20}
+              pattern="[A-Za-z0-9_]{3,20}"
+              value={user!.name}
+              hint="3 to 20 letters, numbers, or underscores, with no spaces. This is the only name other members see."
+            />
+            <Field
+              label="Full name"
+              name="full_name"
+              min={2}
+              max={80}
+              value={user!.full_name || ''}
+              hint="Kept private: only you and TechCare administrators can see it."
+            />
             <Select
               label="Profile visibility"
               name="visibility"
@@ -410,11 +429,11 @@ function Profile() {
               options={['public', 'private']}
             />
             <p className="form-hint">
-              Private hides your bio and picture from non-friends. Your display name and approved
-              public questions remain visible.
+              Private hides your bio and picture from non-friends. Your username and approved public
+              questions remain visible.
             </p>
             <TextArea label="About me" name="bio" max={400} value={user!.bio} required={false} />
-            <Upload name="picture" label="Profile picture" />
+            <Upload key={saves} name="picture" label="Profile picture" />
           </Form>
           <AccountSettings />
         </section>
@@ -552,7 +571,7 @@ function Moderation() {
                     </div>
                     <h2>{p.title}</h2>
                     <p className="preserve-lines">{p.body}</p>
-                    <QuestionImage photo={p.photo} title={p.title} />
+                    <QuestionImage photo={p.photo} photos={p.photos} title={p.title} />
                     <div className="button-row">
                       <button
                         disabled={!!busy}
@@ -731,14 +750,14 @@ function Moderation() {
             }}
           >
             <TextArea
-              label="Note to the author (optional)"
+              label="Note to the author (shown to them with your decision)"
               name="note"
               max={500}
               required={false}
               placeholder="What should they change before resubmitting?"
             />
             <TextArea
-              label="Internal decision note (optional)"
+              label="Internal decision note (only staff can see it)"
               name="reason"
               max={500}
               required={false}
@@ -756,7 +775,7 @@ function Moderation() {
           <div className="review-context">
             <h3>{answer.title}</h3>
             <p>{answer.body}</p>
-            <QuestionImage photo={answer.photo} title={answer.title} />
+            <QuestionImage photo={answer.photo} photos={answer.photos} title={answer.title} />
           </div>
           <Form
             submit="Publish question & answer"
@@ -774,7 +793,7 @@ function Moderation() {
           >
             <TextArea label="Your moderator answer" name="answer" min={3} max={1000} />
             <TextArea
-              label="Internal decision note (optional)"
+              label="Internal decision note (only staff can see it)"
               name="reason"
               max={500}
               required={false}
@@ -802,7 +821,8 @@ function Admin() {
 function AdminAppSettings() {
   const { user, version, refresh, notify } = useTechCare(),
     [busy, setBusy] = useState<number | null>(null),
-    [suspending, setSuspending] = useState<User | null>(null);
+    [suspending, setSuspending] = useState<User | null>(null),
+    [deleting, setDeleting] = useState<User | null>(null);
   const [query, setQuery] = useState('');
   async function restore(u: User) {
     setBusy(u.id);
@@ -865,7 +885,10 @@ function AdminAppSettings() {
                 <Avatar user={{ name: u.name, avatar: '' }} />
                 <div>
                   <strong>{u.name}</strong>
-                  <small>{u.email}</small>
+                  <small>
+                    {u.full_name ? u.full_name + ' · ' : ''}
+                    {u.email}
+                  </small>
                 </div>
                 <Badge>{u.role}</Badge>
                 {!!u.suspended && <Badge tone="danger">Suspended</Badge>}
@@ -904,6 +927,13 @@ function AdminAppSettings() {
                       onClick={() => (u.suspended ? restore(u) : setSuspending(u))}
                     >
                       {u.suspended ? 'Restore' : 'Suspend'}
+                    </button>
+                    <button
+                      disabled={busy !== null}
+                      className="button secondary small danger"
+                      onClick={() => setDeleting(u)}
+                    >
+                      Delete
                     </button>
                   </>
                 )}
@@ -959,6 +989,31 @@ function AdminAppSettings() {
           </Form>
         </Modal>
       )}
+      {deleting && (
+        <Modal
+          title={'Delete ' + deleting.name + '?'}
+          description="Their email, profile, connections, and private messages are removed and they are signed out. Public questions and comments stay, credited to “Deleted member”. This cannot be undone."
+          onClose={() => setDeleting(null)}
+        >
+          <Form
+            submit="Delete account permanently"
+            cancel={{ label: 'Keep account', onClick: () => setDeleting(null) }}
+            onSubmit={async (values) => {
+              const r = await api<Result>('admin/delete-account', { ...values, id: deleting.id });
+              setDeleting(null);
+              notify(r.message!);
+              refresh();
+            }}
+          >
+            <TextArea
+              label="Reason (kept in the activity log)"
+              name="reason"
+              max={500}
+              required={false}
+            />
+          </Form>
+        </Modal>
+      )}
       <div className="callout">
         <ShieldCheck size={22} />
         <p>
@@ -1001,9 +1056,34 @@ function DataExports() {
   );
 }
 
+const logFilters = [
+  ['', 'Everything'],
+  ['staff', 'Staff decisions'],
+  ['account', 'Accounts & security'],
+  ['activity', 'Member posts'],
+] as const;
+// Readable names for logged actions; anything else (staff decisions) is shown as stored.
+const actionNames: Record<string, string> = {
+  'sign-up': 'Signed up',
+  'email-verified': 'Verified email',
+  'sign-in': 'Signed in',
+  'sign-in-locked': 'Sign-in locked',
+  'password-changed': 'Changed password',
+  'password-reset': 'Reset password',
+  'email-changed': 'Changed email',
+  'profile-updated': 'Updated profile',
+  'question-posted': 'Posted a question',
+  'question-edited': 'Edited a question',
+  'comment-posted': 'Posted a comment',
+  'notice-posted': 'Posted a Lost & Found notice',
+  delete: 'Deleted account',
+  suspend: 'Suspended account',
+  restore: 'Restored account',
+};
 function ActivityLog() {
   const { version } = useTechCare();
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(1),
+    [type, setType] = useState('');
   const result = useData<{
     entries: {
       id: number;
@@ -1015,11 +1095,28 @@ function ActivityLog() {
       name: string;
     }[];
     hasMore: boolean;
-  }>('admin/audit?page=' + page, version);
+  }>(`admin/audit?page=${page}&type=${type}`, version);
   return (
     <section className="panel activity-log">
       <h2>Activity log</h2>
-      <p>Staff decisions and account changes, newest first.</p>
+      <p>
+        Staff decisions, sign-ins and other account changes, and new member posts, newest first.
+      </p>
+      <div className="filter-tabs" aria-label="Filter the activity log">
+        {logFilters.map(([key, label]) => (
+          <button
+            key={key}
+            aria-pressed={type === key}
+            className={type === key ? 'active' : ''}
+            onClick={() => {
+              setType(key);
+              setPage(1);
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
       {result.loading ? (
         <Loading />
       ) : result.error ? (
@@ -1030,7 +1127,7 @@ function ActivityLog() {
             <thead>
               <tr>
                 <th scope="col">When</th>
-                <th scope="col">Staff</th>
+                <th scope="col">Who</th>
                 <th scope="col">Action</th>
                 <th scope="col">Target</th>
                 <th scope="col">Reason</th>
@@ -1039,9 +1136,9 @@ function ActivityLog() {
             <tbody>
               {result.data.entries.map((e) => (
                 <tr key={e.id}>
-                  <td>{date(e.created)}</td>
+                  <td>{new Date(e.created * 1000).toLocaleString()}</td>
                   <td>{e.name}</td>
-                  <td>{e.action}</td>
+                  <td>{actionNames[e.action] || e.action}</td>
                   <td>
                     {e.kind} #{e.target}
                   </td>
@@ -1052,7 +1149,7 @@ function ActivityLog() {
           </table>
         </div>
       ) : (
-        <p className="muted">No staff activity yet.</p>
+        <p className="muted">Nothing has been logged here yet.</p>
       )}
       <Pagination page={page} hasMore={result.data?.hasMore || false} onPage={setPage} />
     </section>

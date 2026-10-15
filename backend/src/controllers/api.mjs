@@ -15,9 +15,15 @@ import {
   changePassword,
   requestEmailChange,
   confirmEmailChange,
-  deleteAccount,
+  deleteMember,
 } from '../services/account.mjs';
-import { setSuspended, auditLog, feedbackSummary, exportCsv } from '../services/admin-tools.mjs';
+import {
+  setSuspended,
+  auditLog,
+  feedbackSummary,
+  exportCsv,
+  logActivity,
+} from '../services/admin-tools.mjs';
 import { randomInt } from 'node:crypto';
 import { CONSENT_COOKIE, CONSENT_VERSION, hasConsent } from '../../../shared/src/consent.mjs';
 import { all, one, run, now, transaction, useMySQL } from '../config/db.mjs';
@@ -56,6 +62,9 @@ import { assistantEnabled, streamAnswer } from '../services/assistant.mjs';
 const json = (payload, status = 200, headers = {}) =>
   Response.json(payload, { status, headers: { 'Cache-Control': 'no-store', ...headers } });
 const staff = ['moderator', 'admin'];
+// Sign-in: wrong passwords allowed before the address is locked, and the lock length in seconds.
+const LOGIN_TRIES = 3,
+  LOGIN_LOCK = 900;
 const audit = async (user, action, kind, target, reason = '') =>
   await run(
     'INSERT INTO audit(actor,action,kind,target,reason,created) VALUES(?,?,?,?,?,?)',
@@ -168,7 +177,7 @@ export async function handle(request) {
         'admin/suspend',
         'account/password',
         'account/email/verify',
-        'account/delete',
+        'admin/delete-account',
       ].includes(path)
         ? 'session'
         : ['admin/logo', 'admin/hero'].includes(path)
@@ -223,6 +232,7 @@ async function get(path, url, me, request) {
       assistantAI: assistantEnabled(),
       logo: (await one("SELECT value FROM settings WHERE key='logo'"))?.value || '',
       realtime: isRealtimeAvailable(),
+      emailDomains: v.allowedEmailDomains(),
     });
   if (path === 'branding-icon') {
     const logo = (await one("SELECT value FROM settings WHERE key='logo'"))?.value;
@@ -429,6 +439,10 @@ async function get(path, url, me, request) {
   if (path === 'lost-found') {
     const filter = url.searchParams.get('kind') || '';
     if (filter) v.choice(filter, ['lost', 'found', 'returned', 'archived'], 'notice filter');
+    // Search matches the item, its description, or where it was lost or found.
+    const query = v.text(url.searchParams.get('q') || '', 'Search', 0, 80);
+    const pattern = '%' + query.replace(/[!%_]/g, (character) => '!' + character) + '%';
+    const order = url.searchParams.get('sort') === 'oldest' ? 'ASC' : 'DESC';
     // Unreturned notices past their active window are listed only under Archived.
     const cutoff = now() - LOST_FOUND_DAYS * 86400;
     const rows = await all(
@@ -437,7 +451,8 @@ async function get(path, url, me, request) {
         OR (?='returned' AND returned=1)
         OR (?='archived' AND returned=0 AND created<=?)
         OR (kind=? AND returned=0 AND created>?)
-      ) ORDER BY created DESC,id DESC LIMIT 21 OFFSET ${page.offset}`,
+      ) AND (?='' OR item LIKE ? ESCAPE '!' OR details LIKE ? ESCAPE '!' OR location LIKE ? ESCAPE '!')
+      ORDER BY created ${order},id ${order} LIMIT 21 OFFSET ${page.offset}`,
       me?.id || 0,
       filter,
       cutoff,
@@ -446,6 +461,10 @@ async function get(path, url, me, request) {
       cutoff,
       filter,
       cutoff,
+      query,
+      pattern,
+      pattern,
+      pattern,
     );
     return json(
       paginated(
@@ -482,12 +501,13 @@ async function get(path, url, me, request) {
     const pattern = '%' + query.replace(/[!%_]/g, (character) => '!' + character) + '%';
     const rows = query
       ? await all(
-          `SELECT id,name,email,role,verified,suspended FROM users WHERE name LIKE ? ESCAPE '!' OR email LIKE ? ESCAPE '!' ORDER BY name COLLATE NOCASE,id LIMIT 21 OFFSET ${page.offset}`,
+          `SELECT id,name,full_name,email,role,verified,suspended FROM users WHERE name LIKE ? ESCAPE '!' OR full_name LIKE ? ESCAPE '!' OR email LIKE ? ESCAPE '!' ORDER BY name COLLATE NOCASE,id LIMIT 21 OFFSET ${page.offset}`,
+          pattern,
           pattern,
           pattern,
         )
       : await all(
-          `SELECT id,name,email,role,verified,suspended FROM users WHERE role IN ('admin','moderator') ORDER BY role,name COLLATE NOCASE,id LIMIT 21 OFFSET ${page.offset}`,
+          `SELECT id,name,full_name,email,role,verified,suspended FROM users WHERE role IN ('admin','moderator') ORDER BY role,name COLLATE NOCASE,id LIMIT 21 OFFSET ${page.offset}`,
         );
     return json(paginated(rows, 'users', page));
   }
@@ -555,14 +575,20 @@ async function post(path, d, me, request) {
     );
   }
   if (path === 'register') {
-    const name = v.text(d.name, 'Display name', 2, 80),
-      email = v.email(d.email),
-      password = v.password(d.password);
+    const name = v.username(d.name),
+      fullName = v.text(d.full_name, 'Full name', 2, 80),
+      email = v.allowedEmail(v.email(d.email)),
+      password = v.newPassword(d.password);
     if (await one('SELECT id FROM users WHERE email=?', email))
       throw new Problem(
         'Registration cannot be completed with these details. Try signing in or recovering your account.',
         409,
       );
+    // ponytail: uniqueness is checked here, not by a unique key (deleted accounts all share
+    // "Deleted member"); two sign-ups racing for one username could both pass. Add a unique
+    // index on a separate username column if that ever matters.
+    if (await one('SELECT id FROM users WHERE name=?', name))
+      throw new Problem('That username is taken. Try another one.', 409);
     // Offline SQLite tests use reserved example.test addresses, which have no mail server.
     if (useMySQL()) await v.deliverable(email);
     const code = String(randomInt(1000000)).padStart(6, '0');
@@ -582,8 +608,9 @@ async function post(path, d, me, request) {
       codeHash = passwordHash(code);
     await transaction(async () => {
       const result = await run(
-        'INSERT INTO users(name,email,hash,created) VALUES(?,?,?,?)',
+        'INSERT INTO users(name,full_name,email,hash,created) VALUES(?,?,?,?,?)',
         name,
+        fullName,
         email,
         hash,
         time,
@@ -595,6 +622,8 @@ async function post(path, d, me, request) {
         time + 900,
         time,
       );
+      const id = Number(result.lastInsertRowid);
+      await logActivity(id, 'sign-up', 'user', id);
     });
     return json(
       {
@@ -622,6 +651,7 @@ async function post(path, d, me, request) {
     await transaction(async () => {
       await run('UPDATE users SET verified=1 WHERE id=?', r.id);
       await run('DELETE FROM email_verifications WHERE user_id=?', r.id);
+      await logActivity(r.id, 'email-verified', 'user', r.id);
     });
     return json({ ok: true, message: 'Email verified. You can now sign in.' });
   }
@@ -667,14 +697,51 @@ async function post(path, d, me, request) {
     const email = v.email(d.email),
       password = v.password(d.password),
       u = await one('SELECT * FROM users WHERE email=?', email);
+    // Three wrong passwords lock the address for 15 minutes; a correct one or a reset clears it.
+    const failKey = `login-fail:${email}`,
+      failures = await one(
+        'SELECT count,expires FROM rate_limits WHERE key=? AND expires>?',
+        failKey,
+        time,
+      );
+    const locked = (until) =>
+      new Problem(
+        `Too many wrong passwords. Try again in ${Math.ceil((until - time) / 60)} minutes, or reset your password.`,
+        429,
+      );
+    if (failures && failures.count >= LOGIN_TRIES) throw locked(failures.expires);
     // Equal-cost check when the account is absent.
     if (
       !passwordOK(password, u?.hash || `pbkdf2_sha256$600000$${'00'.repeat(16)}$${'00'.repeat(32)}`)
-    )
-      throw new Problem('Invalid email or password.', 401);
+    ) {
+      const count = (failures?.count || 0) + 1;
+      if (failures)
+        await run(
+          'UPDATE rate_limits SET count=?,expires=? WHERE key=?',
+          count,
+          time + LOGIN_LOCK,
+          failKey,
+        );
+      else {
+        await run('DELETE FROM rate_limits WHERE key=?', failKey);
+        await run('INSERT INTO rate_limits VALUES(?,?,?)', failKey, count, time + LOGIN_LOCK);
+      }
+      if (count >= LOGIN_TRIES) {
+        if (u)
+          await logActivity(u.id, 'sign-in-locked', 'user', u.id, `${LOGIN_TRIES} wrong passwords`);
+        throw locked(time + LOGIN_LOCK);
+      }
+      const left = LOGIN_TRIES - count;
+      throw new Problem(
+        `Invalid email or password. ${left} ${left === 1 ? 'try' : 'tries'} left before sign-in is locked for 15 minutes.`,
+        401,
+      );
+    }
+    await run('DELETE FROM rate_limits WHERE key=?', failKey);
     if (!u.verified) throw new Problem('Verify your email before signing in.', 403);
     if (u.suspended)
       throw new Problem('This account is suspended. Contact the project team for help.', 403);
+    await logActivity(u.id, 'sign-in', 'user', u.id);
     const token = issueJWT(u.id, time);
     await run('DELETE FROM sessions WHERE expires<=?', time);
     await run('INSERT INTO sessions VALUES(?,?,?)', digest(token), u.id, time + 604800);
@@ -721,17 +788,25 @@ async function post(path, d, me, request) {
   }
   if (path === 'reset-password') {
     const token = v.text(d.token, 'Reset token', 20, 100),
-      password = v.password(d.password),
+      password = v.newPassword(d.password),
       r = await one(
         'SELECT * FROM password_resets WHERE token_hash=? AND expires>?',
         digest(token),
         time,
       );
     if (!r) throw new Problem('This recovery token is invalid or expired. Request a new one.');
+    const current = await one('SELECT hash FROM users WHERE id=?', r.user_id);
+    if (passwordOK(password, current.hash))
+      throw new Problem(
+        'This is already your password. Sign in with it, or choose a different new password.',
+      );
     const hash = passwordHash(password);
     await transaction(async () => {
       await run('UPDATE users SET hash=? WHERE id=?', hash, r.user_id);
       await run('DELETE FROM password_resets WHERE user_id=?', r.user_id);
+      const owner = await one('SELECT email FROM users WHERE id=?', r.user_id);
+      await run('DELETE FROM rate_limits WHERE key=?', `login-fail:${owner.email}`);
+      await logActivity(r.user_id, 'password-reset', 'user', r.user_id);
       await run('DELETE FROM sessions WHERE user_id=?', r.user_id);
     });
     return json({ message: 'Password updated. Sign in with your new password.' }, 200, {
@@ -746,22 +821,28 @@ async function post(path, d, me, request) {
   );
   if (path === 'vote') return json(await changeVote(d, me));
   if (path === 'profile') {
-    const name = v.text(d.name, 'Display name', 2, 80),
+    const name = v.username(d.name),
+      // Saving without a full name keeps the stored one (older and script-created accounts may have none).
+      fullName = d.full_name === undefined ? me.full_name : v.text(d.full_name, 'Full name', 2, 80),
       bio = v.text(d.bio || '', 'Bio', 0, 400),
       visibility = v.choice(
         d.visibility || me.visibility,
         ['public', 'private'],
         'profile visibility',
       );
+    if (name !== me.name && (await one('SELECT id FROM users WHERE name=? AND id<>?', name, me.id)))
+      throw new Problem('That username is taken. Try another one.', 409);
     const avatar = d.picture ? await saveMedia(d.picture, me.id, 'profile') : me.avatar;
     await run(
-      'UPDATE users SET name=?,bio=?,visibility=?,avatar=? WHERE id=?',
+      'UPDATE users SET name=?,full_name=?,bio=?,visibility=?,avatar=? WHERE id=?',
       name,
+      fullName,
       bio,
       visibility,
       avatar,
       me.id,
     );
+    await logActivity(me.id, 'profile-updated', 'user', me.id);
     // Replaced pictures would otherwise count against the upload allowance forever.
     if (avatar !== me.avatar) await discardProfileMedia(me.avatar, me.id);
     return json({ user: ownUser(await one('SELECT * FROM users WHERE id=?', me.id)) });
@@ -879,8 +960,7 @@ async function post(path, d, me, request) {
   if (path === 'account/password') return json(await changePassword(d, me, request));
   if (path === 'account/email') return json(await requestEmailChange(d, me, demo));
   if (path === 'account/email/verify') return json(await confirmEmailChange(d, me));
-  if (path === 'account/delete')
-    return json(await deleteAccount(d, me), 200, { 'Set-Cookie': cookie('', true) });
+  if (path === 'admin/delete-account') return json(await deleteMember(d, me));
   if (path === 'admin/suspend') return json(await setSuspended(d, me));
   if (path === 'comments') return json(await saveComment(d, me), 201);
   if (path === 'feedback') {

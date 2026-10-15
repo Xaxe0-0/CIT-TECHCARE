@@ -1,6 +1,8 @@
 export type User = {
   id: number;
+  // Public username; full_name is the private real name, sent only to the account itself and admins.
   name: string;
+  full_name?: string;
   email?: string;
   role: 'member' | 'moderator' | 'admin';
   bio: string;
@@ -26,7 +28,9 @@ export type Announcement = {
 };
 export type VoteState = { score: number; myVote: number };
 export type Post = Partial<VoteState> & {
+  // photo is the first (cover) photo; photos lists all of them, as a list or a JSON string.
   photo?: string;
+  photos?: string[] | string;
   id: number;
   title: string;
   body: string;

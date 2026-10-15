@@ -72,7 +72,7 @@ export function ExitFeedback() {
       >
         <StarRating value={rating} onChange={setRating} legend="Rate your visit" size={34} />
         <TextArea
-          label="Anything we could do better? (optional)"
+          label="Anything we could do better?"
           name="message"
           min={10}
           max={1000}

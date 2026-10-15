@@ -12,9 +12,9 @@ export function Privacy() {
         <section>
           <h2>Your agreement and browser storage</h2>
           <p>
-            TechCare uses your display name, email, password hash, profile details, and the content
-            you submit to provide accounts, discussions, moderation, and community features. Which
-            information others can see is explained below.
+            TechCare uses your full name, username, email, password hash, profile details, and the
+            content you submit to provide accounts, discussions, moderation, and community features.
+            Which information others can see is explained below.
           </p>
           <p>
             A cookie remembers your acceptance of the current Terms of Use and this notice for up to
@@ -27,10 +27,11 @@ export function Privacy() {
         <section>
           <h2>What is public</h2>
           <p>
-            Your display name and published questions, comments, replies, and attached photos are
-            public. Questions are reviewed before publication; comments appear immediately. Public
-            profiles also show a bio and profile picture. A private profile hides your bio and
-            picture from everyone except you and accepted friends.
+            Your username and published questions, comments, replies, and attached photos are
+            public. Your full name is private: only you and administrators can see it. Questions are
+            reviewed before publication; comments appear immediately. Public profiles also show a
+            bio and profile picture. A private profile hides your bio and picture from everyone
+            except you and accepted friends.
           </p>
           <p>
             Approved Lost & Found notices show the item, photos, description, location, date, and
@@ -123,8 +124,8 @@ export function Terms() {
           <p>
             Keep your sign-in details secure. Share only content you have permission to publish, and
             leave out passwords, private identifiers, and other people’s personal information. Your
-            display name and approved discussion contributions, including attached photos, are
-            public even when your profile is private.
+            username and approved discussion contributions, including attached photos, are public
+            even when your profile is private.
           </p>
         </section>
         <section>

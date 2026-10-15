@@ -53,7 +53,7 @@ export function AskQuestionPage() {
         <section className="ask-question-form" aria-label="New question">
           <Form
             key={item?.id ?? 'new'}
-            submit={item ? 'Resubmit for review' : 'Submit for review'}
+            submit={item ? 'Save changes and resubmit question' : 'Post my question for review'}
             submitDisabled={photoBusy}
             onSubmit={async (values) => {
               const result = await api<Result>('posts', item ? { ...values, id: item.id } : values);
@@ -81,23 +81,24 @@ export function AskQuestionPage() {
             />
             {item?.photo && (
               <>
-                <QuestionImage photo={item.photo} title={item.title} />
+                <QuestionImage photo={item.photo} photos={item.photos} title={item.title} />
                 <label className="checkbox-field">
-                  <input type="checkbox" name="removePhoto" value="1" /> Remove the current photo
-                  (adding a new photo also replaces it)
+                  <input type="checkbox" name="removePhoto" value="1" /> Remove the saved photos
+                  (adding new photos also replaces them)
                 </label>
               </>
             )}
             <QuestionPhoto onBusyChange={setPhotoBusy} />
             <p className="form-hint">
-              Your display name, approved question, and attached photo will be public. Leave out
+              Your username, approved question, and attached photo will be public. Leave out
               passwords, contact details, faces, and other private information.
             </p>
           </Form>
         </section>
         <aside className="ask-question-notes" aria-labelledby="question-notes-title">
-          <ChatCircleDots size={25} aria-hidden="true" />
-          <h2 id="question-notes-title">Help others understand the issue</h2>
+          <h2 id="question-notes-title">
+            <ChatCircleDots size={22} aria-hidden="true" /> Help others understand the issue
+          </h2>
           <ul>
             <li>Name the device, app, or operating system.</li>
             <li>Include the exact error message when possible.</li>

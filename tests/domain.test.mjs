@@ -46,7 +46,9 @@ const a = client(),
   guest = client();
 const pw = 'Synthetic-password-7391';
 async function register(who, name, email) {
-  const r = await call(who, 'register', { name, email, password: pw });
+  // name is the public username; full_name stays private.
+  const username = name.toLowerCase().replace(/\W+/g, '_');
+  const r = await call(who, 'register', { name: username, full_name: name, email, password: pw });
   assert.equal(r.status, 201);
   return r.data.development_code;
 }
@@ -77,7 +79,8 @@ try {
         await verify(a, 'ari@example.test', code);
         assert.equal((await call(a, 'verify', { email: 'ari@example.test', code })).status, 400);
         const duplicate = await call(a, 'register', {
-          name: 'Duplicate',
+          name: 'duplicate',
+          full_name: 'Duplicate',
           email: ' ARI@example.test ',
           password: pw,
         });
@@ -148,7 +151,8 @@ try {
         assert.equal(
           (
             await call(guest, 'register', {
-              name: 'No Mail',
+              name: 'no_mail',
+              full_name: 'No Mail',
               email: 'nomail@example.test',
               password: pw,
             })
@@ -160,7 +164,12 @@ try {
         const r = await call(
           guest,
           'register',
-          { name: 'Proxy Test', email: 'proxy@example.test', password: pw },
+          {
+            name: 'proxy_test',
+            full_name: 'Proxy Test',
+            email: 'proxy@example.test',
+            password: pw,
+          },
           { 'x-forwarded-for': '203.0.113.1' },
         );
         assert.equal(r.status, 503);
@@ -204,7 +213,8 @@ try {
             };
           };
           const r = await call(guest, 'register', {
-            name: 'SMTP Test',
+            name: 'smtp_test',
+            full_name: 'SMTP Test',
             email: 'smtp@example.test',
             password: pw,
           });
@@ -223,7 +233,8 @@ try {
           assert.equal(
             (
               await call(guest, 'register', {
-                name: 'Failed Mail',
+                name: 'failed_mail',
+                full_name: 'Failed Mail',
                 email: 'failedmail@example.test',
                 password: pw,
               })
@@ -445,7 +456,7 @@ try {
           .toBuffer();
         const pic = 'data:image/png;base64,' + buffer.toString('base64');
         const valid = await call(b, 'profile', {
-          name: 'Bea Test',
+          name: 'bea_test',
           bio: 'A private introduction',
           visibility: 'private',
           picture: pic,
@@ -455,9 +466,9 @@ try {
         const bad =
           'data:image/png;base64,' +
           Buffer.from('\x89PNG\r\n\x1a\nsmall-picture').toString('base64');
-        assert.equal((await call(b, 'profile', { name: 'Bea Test', picture: bad })).status, 400);
+        assert.equal((await call(b, 'profile', { name: 'bea_test', picture: bad })).status, 400);
         const huge = 'data:image/png;base64,' + Buffer.alloc(3000001).toString('base64');
-        assert.equal((await call(b, 'profile', { name: 'Bea Test', picture: huge })).status, 400);
+        assert.equal((await call(b, 'profile', { name: 'bea_test', picture: huge })).status, 400);
         assert.equal((await call(a, 'admin/hero', { file: pic })).status, 200);
         assert.equal((await call(guest, 'admin/logo', { file: pic })).status, 401);
         assert.equal((await call(b, 'admin/logo', { file: pic })).status, 403);
@@ -493,7 +504,7 @@ try {
           'image/webp',
         );
         const replaced = await call(b, 'profile', {
-          name: 'Bea Test',
+          name: 'bea_test',
           bio: 'A private introduction',
           visibility: 'private',
           picture: pic,
@@ -637,7 +648,7 @@ try {
         );
         assert.equal(
           (await call(guest, `comments?post=${postId}`)).data.comments.find(
-            (r) => r.name === 'Bea Test',
+            (r) => r.name === 'bea_test',
           ).avatar,
           '',
         );

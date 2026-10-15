@@ -9,7 +9,7 @@ import {
   closeMySQLPool,
   assertDatabaseReady,
 } from '../backend/src/config/db.mjs';
-import { email, password, text } from '../backend/src/validations/validation.mjs';
+import { email, newPassword, text, username } from '../backend/src/validations/validation.mjs';
 nextEnv.loadEnvConfig(process.cwd());
 if (process.env.NODE_ENV === 'production' || process.env.TECHCARE_DB_DRIVER === 'mysql')
   await assertDatabaseReady();
@@ -22,16 +22,20 @@ const output = new Writable({
 });
 const input = createInterface({ input: process.stdin, output, terminal: true });
 try {
-  const name = text(await input.question('Administrator display name: '), 'Name', 2, 80);
+  const name = username(await input.question('Administrator username (shown publicly): '));
+  const fullName = text(await input.question('Administrator full name: '), 'Full name', 2, 80);
   const address = email(await input.question('Administrator email: '));
-  process.stdout.write('Password (12 to 128 characters, hidden): ');
+  process.stdout.write(
+    'Password (12+ characters with uppercase, lowercase, a number and a symbol; hidden): ',
+  );
   muted = true;
-  const pw = password(await input.question(''));
+  const pw = newPassword(await input.question(''));
   muted = false;
   process.stdout.write('\n');
   await run(
-    "INSERT INTO users(name,email,hash,role,verified,created) VALUES(?,?,?,'admin',1,?)",
+    "INSERT INTO users(name,full_name,email,hash,role,verified,created) VALUES(?,?,?,?,'admin',1,?)",
     name,
+    fullName,
     address,
     passwordHash(pw),
     now(),

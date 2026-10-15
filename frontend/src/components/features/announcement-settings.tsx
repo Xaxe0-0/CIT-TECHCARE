@@ -48,6 +48,7 @@ function AnnouncementEditor({
     >
       <Form
         publishing
+        cancel={{ label: 'Cancel', onClick: close }}
         submit="Publish announcement"
         onSubmit={async (values, progress) => {
           const result = await api<Result>(
@@ -88,7 +89,11 @@ function AnnouncementEditor({
         </label>
         {!campusImage && (
           <Upload
-            label={item && !existingCampusImage ? 'Replace image (optional)' : 'Announcement image'}
+            label={
+              item && !existingCampusImage
+                ? 'Replace image (leave empty to keep the current one)'
+                : 'Announcement image'
+            }
             required={!item || !!existingCampusImage}
             onChange={setFile}
           />
@@ -103,7 +108,7 @@ function AnnouncementEditor({
         )}
         <Field label="Title" name="title" min={3} max={100} value={item?.title} />
         <TextArea
-          label="Short description (optional)"
+          label="Short description"
           name="description"
           max={280}
           required={false}
@@ -120,15 +125,9 @@ function AnnouncementEditor({
           }
           placeholder="Describe what the image shows"
         />
+        <Field label="Event date" name="date" type="date" required={false} value={item?.date} />
         <Field
-          label="Event date (optional)"
-          name="date"
-          type="date"
-          required={false}
-          value={item?.date}
-        />
-        <Field
-          label="Details link (optional)"
+          label="Details link (starts with https://)"
           name="link"
           type="url"
           max={1000}
@@ -136,9 +135,6 @@ function AnnouncementEditor({
           value={item?.link}
           placeholder="https://…"
         />
-        <Link href="/admin" className="text-button">
-          Cancel
-        </Link>
       </Form>
     </EditorFrame>
   );

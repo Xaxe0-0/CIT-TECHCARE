@@ -108,8 +108,8 @@ export function requireUser(user, roles) {
 }
 export function ownUser(u) {
   if (!u) return null;
-  const { id, name, email, role, bio, avatar, visibility } = u;
-  return { id, name, email, role, bio, avatar, visibility };
+  const { id, name, full_name, email, role, bio, avatar, visibility } = u;
+  return { id, name, full_name, email, role, bio, avatar, visibility };
 }
 export async function blocked(a, b) {
   return !!(await one(
