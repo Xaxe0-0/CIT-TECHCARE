@@ -21,15 +21,6 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
     useData<{ emailDomains?: string[] }>(mode === 'register' ? 'settings' : null).data
       ?.emailDomains || [];
   const [now, setNow] = useState(() => Date.now());
-  // The verification email links to /verify?email=…&code=…, which fills the form in one tap.
-  const [linkCode, setLinkCode] = useState('');
-  useEffect(() => {
-    if (mode !== 'verify') return;
-    const query = new URLSearchParams(window.location.search);
-    if (query.get('email')) updateAuthDraft({ email: query.get('email')! });
-    if (/^\d{6}$/.test(query.get('code') || '')) setLinkCode(query.get('code')!);
-    // Read once on arrival; later edits belong to the person.
-  }, [mode]);
   const [resending, setResending] = useState(false);
   const [resendError, setResendError] = useState('');
   const wait = Math.max(0, Math.ceil(RESEND_SECONDS - (now - sentAt) / 1000));
@@ -141,7 +132,7 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
           </div>
         )}
       <Form
-        key={mode + linkCode}
+        key={mode}
         submit={
           {
             login: 'Sign In',
@@ -220,12 +211,13 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
         )}
         {mode === 'verify' && (
           <>
-            <CodeInput label="Six-digit code" name="code" initial={linkCode} />
+            <CodeInput label="Six-digit code" name="code" />
             <div className="resend-code">
               <button
                 type="button"
                 className="text-button"
                 disabled={resending || wait > 0}
+                aria-busy={resending}
                 onClick={(event) => void resend(event.currentTarget)}
               >
                 {resending

@@ -406,8 +406,7 @@ try {
     assert.equal((await call('profile', { name: 'ANA_R' }, sessions.other)).status, 409);
   });
 
-  await test('code emails select in one tap and can open the verify page filled in', () => {
-    const href = 'https://technologycares.tech/verify?email=ana%40uls.edu.ph&code=012345';
+  await test('code emails select in one tap and carry no links', () => {
     const mail = codeEmail({
       subject: 'Verify',
       heading: 'Verify your email',
@@ -415,21 +414,10 @@ try {
       label: 'Code',
       code: '012345',
       note: 'Ignore if not you.',
-      action: { label: 'Verify my email', href },
     });
     assert.ok(mail.html.includes('user-select:all'));
-    assert.ok(mail.html.includes(`href="${href.replace('&', '&#38;')}"`));
-    assert.ok(mail.text.includes(href), 'plain-text email carries the link too');
-    assert.ok(
-      !codeEmail({
-        ...mail,
-        code: '1',
-        heading: 'h',
-        intro: 'i',
-        label: 'l',
-        note: 'n',
-      }).html.includes('<a href'),
-    );
+    assert.ok(!mail.html.includes('<a href'));
+    assert.ok(mail.text.includes('012345'));
   });
 
   await test('members sign in with their email address or their username', async () => {

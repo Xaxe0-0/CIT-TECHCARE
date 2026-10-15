@@ -504,7 +504,8 @@ function Moderation() {
   }, [answer, notify, result.data]);
   async function decide(kind: string, id: number, status: string) {
     if (busy) return;
-    setBusy(`${kind}${id}`);
+    // Keyed by the decision too, so only the pressed button shows a spinner.
+    setBusy(`${kind}${id}${status}`);
     try {
       const r = await api<Result>('moderate', { kind, id, status });
       notify(r.message!);
@@ -583,6 +584,7 @@ function Moderation() {
                       <button
                         disabled={!!busy}
                         className="button secondary"
+                        aria-busy={busy === `post${p.id}published`}
                         onClick={() => decide('post', p.id, 'published')}
                       >
                         Approve
@@ -615,6 +617,7 @@ function Moderation() {
                       <button
                         disabled={!!busy}
                         className="button primary"
+                        aria-busy={busy === `comment${c.id}published`}
                         onClick={() => decide('comment', c.id, 'published')}
                       >
                         Approve
@@ -622,6 +625,7 @@ function Moderation() {
                       <button
                         disabled={!!busy}
                         className="button secondary danger"
+                        aria-busy={busy === `comment${c.id}rejected`}
                         onClick={() => decide('comment', c.id, 'rejected')}
                       >
                         Reject
@@ -647,6 +651,7 @@ function Moderation() {
                       <button
                         disabled={!!busy}
                         className="button primary"
+                        aria-busy={busy === `report${r.id}published`}
                         onClick={() => decide('report', r.id, 'published')}
                       >
                         Approve

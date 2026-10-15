@@ -23,7 +23,9 @@ export function Members() {
     [query, setQuery] = useState(''),
     [page, setPage] = useState(1),
     [conversation, setConversation] = useState<User | null>(null),
-    [busy, setBusy] = useState<number | null>(null);
+    [busy, setBusy] = useState<number | null>(null),
+    // The pressed action (e.g. 'follow', 'friend:accept'), so only that button shows a spinner.
+    [pending, setPending] = useState('');
   const result = useData<{ members: User[]; hasMore: boolean }>(
     `members?q=${encodeURIComponent(query)}&page=${page}`,
     version,
@@ -31,6 +33,7 @@ export function Members() {
   async function action(path: string, u: User, mode?: string) {
     if (busy !== null) return;
     setBusy(u.id);
+    setPending(mode ? `${path}:${mode}` : path);
     try {
       await api(path, { user_id: u.id, action: mode });
       refresh();
@@ -96,6 +99,7 @@ export function Members() {
                     disabled={busy === u.id}
                     className="button secondary small"
                     aria-pressed={!!u.following}
+                    aria-busy={busy === u.id && pending === 'follow'}
                     onClick={() => action('follow', u)}
                   >
                     {u.following ? 'Unfollow' : 'Follow'}
@@ -106,6 +110,11 @@ export function Members() {
                         disabled={busy === u.id}
                         // Inviting actions are primary; pending or undo actions stay secondary.
                         className={`button small ${['none', 'incoming'].includes(u.friendship || 'none') ? 'primary' : 'secondary'}`}
+                        aria-busy={
+                          busy === u.id &&
+                          pending ===
+                            `friend:${u.friendship === 'incoming' ? 'accept' : (u.friendship || 'none') === 'none' ? 'request' : 'remove'}`
+                        }
                         onClick={() =>
                           action(
                             'friend',
@@ -131,6 +140,7 @@ export function Members() {
                       {u.friendship === 'incoming' && (
                         <button
                           className="button secondary small"
+                          aria-busy={busy === u.id && pending === 'friend:remove'}
                           onClick={() => action('friend', u, 'remove')}
                         >
                           Decline
@@ -150,6 +160,7 @@ export function Members() {
                   <button
                     disabled={busy === u.id}
                     className="member-block"
+                    aria-busy={busy === u.id && pending.startsWith('block')}
                     onClick={() => action('block', u, u.blocked ? 'unblock' : 'block')}
                   >
                     {u.blocked ? 'Unblock' : 'Block'}

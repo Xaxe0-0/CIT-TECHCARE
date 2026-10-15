@@ -601,10 +601,6 @@ async function post(path, d, me, request) {
         label: 'TechCare verification code',
         code,
         note: 'If you did not register, you can ignore this email.',
-        action: {
-          label: 'Verify my email',
-          href: `${process.env.TECHCARE_ORIGIN}/verify?email=${encodeURIComponent(email)}&code=${code}`,
-        },
       }),
       demo,
     );
@@ -680,10 +676,6 @@ async function post(path, d, me, request) {
           label: 'TechCare verification code',
           code,
           note: 'If you did not request this, you can ignore this email.',
-          action: {
-            label: 'Verify my email',
-            href: `${process.env.TECHCARE_ORIGIN}/verify?email=${encodeURIComponent(email)}&code=${code}`,
-          },
         }),
         demo,
       );

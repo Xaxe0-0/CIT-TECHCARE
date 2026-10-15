@@ -183,7 +183,9 @@ export function Form({
   cancel?: { label: string; onClick: () => void };
 }) {
   const [busy, setBusy] = useState(false),
-    [error, setError] = useState('');
+    [error, setError] = useState(''),
+    // Which submit button was pressed, so only that one shows the loading spinner.
+    [pressed, setPressed] = useState('');
   const lock = useRef(false);
   const [progress, setProgress] = useState<number | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -231,11 +233,12 @@ export function Form({
       return;
     }
     lock.current = true;
+    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    setPressed(submitter?.value === 'draft' ? 'draft' : 'main');
     setBusy(true);
     setError('');
     try {
       const values = await formValues(form);
-      const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
       if (submitter?.name) values[submitter.name] = submitter.value;
       await onSubmit(values, setProgress);
       if (reset) {
@@ -286,6 +289,7 @@ export function Form({
                 name="status"
                 value="draft"
                 disabled={submitDisabled}
+                aria-busy={busy && pressed === 'draft'}
               >
                 Save draft
               </button>
@@ -296,8 +300,9 @@ export function Form({
               name={publishing ? 'status' : undefined}
               value={publishing ? 'published' : undefined}
               disabled={submitDisabled}
+              aria-busy={busy && pressed === 'main'}
             >
-              {busy ? 'Please wait…' : submit}
+              {submit}
             </button>
             {cancel && (
               <button className="button secondary" type="button" onClick={cancel.onClick}>
@@ -440,19 +445,9 @@ export function Field({
 // Six single-digit boxes for emailed codes. Digits only: typing moves forward, Backspace and the
 // arrow keys move back, and a pasted code (or the phone's one-time-code autofill) fills every box.
 // The six digits are submitted together under `name`, like a normal field.
-export function CodeInput({
-  label,
-  name,
-  initial = '',
-}: {
-  label: string;
-  name: string;
-  initial?: string;
-}) {
+export function CodeInput({ label, name }: { label: string; name: string }) {
   const { error, id, errorId } = useFieldError(name);
-  const [digits, setDigits] = useState(() =>
-    Array.from({ length: 6 }, (_, i) => initial.replace(/\D/g, '')[i] || ''),
-  );
+  const [digits, setDigits] = useState(() => Array<string>(6).fill(''));
   const boxes = useRef<(HTMLInputElement | null)[]>([]);
   const focus = (i: number) => boxes.current[Math.max(0, Math.min(5, i))]?.focus();
   function fill(from: number, text: string) {

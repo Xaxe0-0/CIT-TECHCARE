@@ -19,15 +19,10 @@ const logo = {
 
 // Branded email for a one-time code: centred logo, short message, and the code in large type.
 // The plain-text part keeps the same wording for mail apps that block HTML.
-// action: optional { href, label } button, e.g. a link that opens the verify page already filled in.
-export function codeEmail({ subject, heading, intro, code, label, note, action }) {
+export function codeEmail({ subject, heading, intro, code, label, note }) {
   const long = code.length > 8;
   // Email apps block scripts, so there is no copy button: the code selects as one piece with a
-  // single tap or double-click, and the action button skips copying altogether.
-  const button = action
-    ? `<tr><td align="center" style="padding:22px 32px 0;"><a href="${escape(action.href)}" style="display:inline-block;background:#0a68fc;color:#ffffff;font-size:16px;font-weight:700;text-decoration:none;padding:14px 28px;border-radius:12px;">${escape(action.label)}</a></td></tr>
-<tr><td align="center" style="padding:10px 32px 0;font-size:12px;line-height:1.5;color:#8a8780;">The button opens TechCare with your email and code already filled in.</td></tr>`
-    : '';
+  // single tap or double-click.
   const html = `<!doctype html>
 <html><body style="margin:0;padding:0;background:#eef4ff;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef4ff;padding:32px 12px;">
@@ -43,7 +38,6 @@ export function codeEmail({ subject, heading, intro, code, label, note, action }
 <div style="background:#edf3ff;border:2px dashed #0a68fc;border-radius:16px;padding:${long ? '18px 14px' : '22px 8px 22px 22px'};font-family:'Courier New',Consolas,monospace;font-weight:800;color:#0a68fc;user-select:all;-webkit-user-select:all;${long ? 'font-size:18px;letter-spacing:1px;word-break:break-all;' : 'font-size:52px;letter-spacing:14px;line-height:1;'}">${escape(code)}</div>
 <div style="padding-top:8px;font-size:12px;color:#8a8780;">Tap or double-click the ${long ? 'token' : 'code'} to select it, then copy.</div>
 </td></tr>
-${button}
 <tr><td align="center" style="padding:16px 32px 0;font-size:14px;color:#3d3d3a;">Expires in <strong>15 minutes</strong>.</td></tr>
 <tr><td align="center" style="padding:24px 32px 30px;font-size:12px;line-height:1.6;color:#8a8780;">${escape(note)} Never share this ${long ? 'token' : 'code'}: TechCare staff will never ask for it.</td></tr>
 </table>
@@ -53,7 +47,7 @@ ${button}
   return {
     subject,
     html,
-    text: `${intro} Your ${long ? 'token' : 'code'} is ${code}. It expires in 15 minutes.${action ? ` ${action.label}: ${action.href}` : ''} ${note}`,
+    text: `${intro} Your ${long ? 'token' : 'code'} is ${code}. It expires in 15 minutes. ${note}`,
   };
 }
 
