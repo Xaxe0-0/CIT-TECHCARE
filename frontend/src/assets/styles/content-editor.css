@@ -684,7 +684,9 @@ button.inbox-row:hover,
 :root[data-theme='dark'] .brand > span > span {
   color: var(--brand-teal-text);
 }
-.badge.brand {
+/* Role badges (Administrator, Moderator). Not ".brand": that is the sidebar logo, whose margins
+   lifted the badge above the name. */
+.badge.role {
   background: color-mix(in srgb, var(--brand-teal) 16%, transparent);
   color: var(--brand-teal-text);
 }
