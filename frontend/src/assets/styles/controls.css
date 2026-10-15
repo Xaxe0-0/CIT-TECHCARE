@@ -38,13 +38,13 @@
     .featured-topics button,
     .search-field button
   ):not(:where(.topbar *, .sidebar-toggle, .sidebar-close)) {
-  min-height: 44px;
+  min-height: 36px;
   border: 1px solid var(--control-border);
   border-radius: 8px;
   background: var(--control-bg);
   color: var(--control-ink);
   box-shadow: var(--control-shadow);
-  font-size: 17px;
+  font-size: 14px;
   font-weight: 650;
   line-height: 1.4;
   text-shadow: none;
@@ -57,7 +57,7 @@
 
 :root[data-theme]
   :is(.text-button, .account-button, .assistant-footer button, .search-field button) {
-  padding: 9px 12px;
+  padding: 6px 12px;
 }
 
 :root[data-theme]
@@ -218,9 +218,10 @@
   flex-wrap: wrap;
 }
 
-/* A small, consistent increase for reading text and secondary labels. */
+/* Type scale in line with social forums (Reddit, Facebook): 15px reading text, 13px metadata,
+   12px small labels. Inputs stay at 16px so phones do not zoom in when they are focused. */
 body {
-  font-size: 19px;
+  font-size: 15px;
 }
 
 :root[data-theme]
@@ -239,17 +240,17 @@ body {
     .assistant-message h3,
     .assistant-composer input,
     .home-page .community-note p,
-    .home-page .first-discussion p,
-    .field input,
-    .field textarea,
-    .field select,
-    .search-field input
+    .home-page .first-discussion p
   ) {
-  font-size: 18px;
+  font-size: 15px;
+}
+
+:root[data-theme] :is(.field input, .field textarea, .field select, .search-field input) {
+  font-size: 16px;
 }
 
 :root[data-theme] .home-page .hero-copy p {
-  font-size: 20px;
+  font-size: 16px;
 }
 
 :root[data-theme]
@@ -259,7 +260,7 @@ body {
     .announcements-heading h2,
     .home-page .booth-details span
   ) {
-  font-size: 17px;
+  font-size: 15px;
 }
 
 :root[data-theme]
@@ -287,7 +288,7 @@ body {
     .topbar .text-button,
     .account-button
   ) {
-  font-size: 16px;
+  font-size: 13px;
 }
 
 :root[data-theme]
@@ -305,7 +306,7 @@ body {
     .badge,
     .sidebar > small
   ) {
-  font-size: 14px;
+  font-size: 12px;
 }
 
 .topbar-actions {
@@ -353,7 +354,7 @@ body {
     padding-inline: 10px;
   }
   :root[data-theme] .home-page .hero-copy p {
-    font-size: 19px;
+    font-size: 15px;
   }
   .home-page .hero-actions {
     gap: 12px;
