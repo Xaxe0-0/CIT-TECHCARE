@@ -1,4 +1,4 @@
--- TechCare MySQL 8.0.16+ schema (latest application schema, migration version 9).
+-- TechCare MySQL 8.0.16+ schema (latest application schema, migration version 10).
 -- Select the application database before applying this file.
 SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
 
