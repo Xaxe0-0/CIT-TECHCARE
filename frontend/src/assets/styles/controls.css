@@ -364,14 +364,58 @@ body {
 }
 
 @media (max-width: 380px) {
+  /* Keep the bar on one row at 320px: menu, theme, Sign In, and Create Account need ~274px. */
+  .topbar,
+  .topbar-actions {
+    flex-wrap: nowrap;
+  }
+  .topbar-actions {
+    gap: 4px;
+  }
   :root[data-theme] .topbar :is(.button, .text-button) {
     padding-inline: 8px;
+    font-size: 14px;
   }
 }
 
 @media (max-width: 480px) {
   .topbar .breadcrumb > span {
     display: none;
+  }
+}
+
+/* Search buttons show their label on wide screens and only an icon on phones, so the text box
+   keeps room for the placeholder and what people type. */
+.search-field button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.search-button-icon {
+  display: none;
+}
+@media (max-width: 560px) {
+  .search-field-icon {
+    display: none;
+  }
+  .search-button-icon {
+    display: block;
+  }
+  .search-button-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+  :root[data-theme] .search-field {
+    padding-left: 16px;
+  }
+  :root[data-theme] .search-field button {
+    width: 44px;
+    padding: 0;
   }
 }
 

@@ -679,18 +679,21 @@ export function Search({
         onSearch(String(new FormData(e.currentTarget).get('q') || ''));
       }}
     >
-      <MagnifyingGlass size={20} />
+      <MagnifyingGlass size={20} className="search-field-icon" aria-hidden="true" />
       <input
         key={value}
         name="q"
         type="search"
+        enterKeyHint="search"
         maxLength={80}
         placeholder={placeholder}
         aria-label={placeholder}
         defaultValue={value}
       />
+      {/* On phones the button shrinks to an icon so the text box keeps its width. */}
       <button type="submit" className="text-button">
-        Search
+        <MagnifyingGlass size={20} className="search-button-icon" aria-hidden="true" />
+        <span className="search-button-label">Search</span>
       </button>
     </form>
   );
