@@ -1,5 +1,5 @@
 import { randomInt } from 'node:crypto';
-import { one, run, now, transaction } from '../config/db.mjs';
+import { one, run, now, transaction, useMySQL } from '../config/db.mjs';
 import {
   Problem,
   requireUser,
@@ -44,6 +44,7 @@ export async function requestEmailChange(d, me, demo) {
   if (email === me.email) throw new Problem('This is already your account email.');
   if (await one('SELECT id FROM users WHERE email=?', email))
     throw new Problem('This email cannot be used. Try another address.', 409);
+  if (useMySQL()) await v.deliverable(email);
   const code = String(randomInt(1000000)).padStart(6, '0');
   await sendMail(
     email,

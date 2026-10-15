@@ -20,7 +20,7 @@ import {
 import { setSuspended, auditLog, feedbackSummary, exportCsv } from '../services/admin-tools.mjs';
 import { randomInt } from 'node:crypto';
 import { CONSENT_COOKIE, CONSENT_VERSION, hasConsent } from '../../../shared/src/consent.mjs';
-import { all, one, run, now, transaction } from '../config/db.mjs';
+import { all, one, run, now, transaction, useMySQL } from '../config/db.mjs';
 import {
   Problem,
   currentUser,
@@ -563,6 +563,8 @@ async function post(path, d, me, request) {
         'Registration cannot be completed with these details. Try signing in or recovering your account.',
         409,
       );
+    // Offline SQLite tests use reserved example.test addresses, which have no mail server.
+    if (useMySQL()) await v.deliverable(email);
     const code = String(randomInt(1000000)).padStart(6, '0');
     await sendMail(
       email,

@@ -1,4 +1,5 @@
 import { Problem } from '../middleware/auth.mjs';
+import { Resolver } from 'node:dns/promises';
 export const categories = [
   'General',
   'Hardware',
@@ -26,6 +27,20 @@ export function email(value) {
   const v = text(value, 'Email', 3, 160).toLowerCase();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) throw new Problem('Enter a valid email address.');
   return v;
+}
+const resolver = new Resolver({ timeout: 3000, tries: 2 });
+// Rejects addresses whose domain cannot receive mail: no MX record (made-up domains such as
+// "dsadasdasd.com") or a "null MX" that refuses all mail. A DNS outage lets the address
+// through, so sign-up never depends on the lookup; the emailed code still has to arrive.
+export async function deliverable(email) {
+  const domain = email.slice(email.lastIndexOf('@') + 1);
+  try {
+    const records = await resolver.resolveMx(domain);
+    if (records.some((record) => record.exchange && record.exchange !== '.')) return email;
+  } catch (error) {
+    if (!['ENOTFOUND', 'ENODATA'].includes(error.code)) return email;
+  }
+  throw new Problem('This email address cannot receive mail. Check it for typos.');
 }
 export function password(value) {
   if (typeof value !== 'string' || value.length < 12 || value.length > 128)
