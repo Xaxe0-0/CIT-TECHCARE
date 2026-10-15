@@ -20,6 +20,7 @@
     "test:discussion": "npm run build && node scripts/discussion-check.mjs",
     "test:assistant": "node scripts/assistant-check.mjs",
     "setup:database": "node scripts/setup-database.mjs",
+    "backup": "node scripts/backup.mjs",
     "test:email": "node scripts/send-test-email.mjs"
   },
   "engines": {
