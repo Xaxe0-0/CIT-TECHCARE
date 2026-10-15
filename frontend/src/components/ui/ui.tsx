@@ -305,6 +305,9 @@ export function Form({
     </FormErrors.Provider>
   );
 }
+// Must match newPassword() in backend/src/validations/validation.mjs.
+export const PASSWORD_RULE =
+  'At least 12 characters, including an uppercase letter, a lowercase letter, a number, and a symbol such as ! or -.';
 export function Field({
   label,
   name,
@@ -317,9 +320,12 @@ export function Field({
   autoComplete,
   pattern,
   inputMode,
+  hint,
 }: {
   label: string;
   name: string;
+  // Guidance shown under the input, such as password rules.
+  hint?: string;
   type?: HTMLInputTypeAttribute;
   min?: number;
   max?: number;
@@ -338,7 +344,9 @@ export function Field({
       aria-labelledby={`${id}-label`}
       id={id}
       aria-invalid={!!error}
-      aria-describedby={error ? errorId : undefined}
+      aria-describedby={
+        [hint && `${id}-hint`, error && errorId].filter(Boolean).join(' ') || undefined
+      }
       pattern={pattern}
       inputMode={inputMode}
       name={name}
@@ -373,6 +381,11 @@ export function Field({
         </span>
       ) : (
         input
+      )}
+      {hint && (
+        <small className="field-hint" id={`${id}-hint`}>
+          {hint}
+        </small>
       )}
       <FieldError id={errorId} error={error} />
     </label>

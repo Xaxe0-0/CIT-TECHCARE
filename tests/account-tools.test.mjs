@@ -179,7 +179,7 @@ try {
 
   await test('password changes require the current password and sign out other devices', async () => {
     const second = await login('member@example.test');
-    const next = 'Another-synthetic-password';
+    const next = 'Another-synthetic-password-2';
     assert.equal(
       (
         await call(
@@ -198,10 +198,18 @@ try {
     assert.equal((await call('me', null, second)).data.user, null);
     assert.equal(await login('member@example.test'), 401);
     assert.equal(typeof (await login('member@example.test', next)), 'string');
+    const weak = await call(
+      'account/password',
+      { current: next, password: 'only-lowercase-letters' },
+      sessions.member,
+    );
+    assert.match(weak.data.error, /add an uppercase letter and a number/);
+    const same = await call('account/password', { current: next, password: next }, sessions.member);
+    assert.match(same.data.error, /different from your current one/);
   });
 
   await test('email changes take effect only after the new address confirms a code', async () => {
-    const next = 'Another-synthetic-password';
+    const next = 'Another-synthetic-password-2';
     assert.equal(
       (
         await call(
@@ -305,7 +313,7 @@ try {
   });
 
   await test('only admins delete accounts; personal data goes and public posts remain', async () => {
-    const next = 'Another-synthetic-password';
+    const next = 'Another-synthetic-password-2';
     const kept = one(
       'SELECT id FROM posts WHERE user_id=? AND status=?',
       ids.member,

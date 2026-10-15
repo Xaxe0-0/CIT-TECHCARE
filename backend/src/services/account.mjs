@@ -24,7 +24,10 @@ async function confirmPassword(me, password) {
 export async function changePassword(d, me, request) {
   requireUser(me);
   await confirmPassword(me, d.current);
-  const hash = passwordHash(v.password(d.password));
+  const password = v.newPassword(d.password);
+  if (passwordOK(password, me.hash))
+    throw new Problem('Choose a new password that is different from your current one.');
+  const hash = passwordHash(password);
   await transaction(async () => {
     await run('UPDATE users SET hash=? WHERE id=?', hash, me.id);
     await run('DELETE FROM password_resets WHERE user_id=?', me.id);

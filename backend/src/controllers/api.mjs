@@ -560,7 +560,7 @@ async function post(path, d, me, request) {
   if (path === 'register') {
     const name = v.text(d.name, 'Display name', 2, 80),
       email = v.email(d.email),
-      password = v.password(d.password);
+      password = v.newPassword(d.password);
     if (await one('SELECT id FROM users WHERE email=?', email))
       throw new Problem(
         'Registration cannot be completed with these details. Try signing in or recovering your account.',
@@ -756,13 +756,18 @@ async function post(path, d, me, request) {
   }
   if (path === 'reset-password') {
     const token = v.text(d.token, 'Reset token', 20, 100),
-      password = v.password(d.password),
+      password = v.newPassword(d.password),
       r = await one(
         'SELECT * FROM password_resets WHERE token_hash=? AND expires>?',
         digest(token),
         time,
       );
     if (!r) throw new Problem('This recovery token is invalid or expired. Request a new one.');
+    const current = await one('SELECT hash FROM users WHERE id=?', r.user_id);
+    if (passwordOK(password, current.hash))
+      throw new Problem(
+        'This is already your password. Sign in with it, or choose a different new password.',
+      );
     const hash = passwordHash(password);
     await transaction(async () => {
       await run('UPDATE users SET hash=? WHERE id=?', hash, r.user_id);

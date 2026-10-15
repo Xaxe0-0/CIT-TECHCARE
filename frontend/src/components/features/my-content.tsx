@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { Image as ImageIcon } from '@phosphor-icons/react';
 import { useTechCare } from '@/context/techcare-context';
-import { Badge, Empty, Field, Form, date } from '../ui/ui';
+import { Badge, Empty, Field, Form, PASSWORD_RULE, date } from '../ui/ui';
 import { api } from '@/services/api';
 import type { OwnReport, Post, Result } from '@shared/types';
 
@@ -152,7 +152,8 @@ export function AccountSettings() {
             autoComplete="current-password"
           />
           <Field
-            label="New password (12 to 128 characters)"
+            label="New password"
+            hint={PASSWORD_RULE}
             name="password"
             type="password"
             min={12}

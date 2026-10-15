@@ -42,6 +42,23 @@ export async function deliverable(email) {
   }
   throw new Problem('This email address cannot receive mail. Check it for typos.');
 }
+// New or changed passwords. Sign-in keeps using password() so older passwords still work.
+export function newPassword(value) {
+  const v = password(value);
+  const missing = [
+    [/[a-z]/, 'a lowercase letter'],
+    [/[A-Z]/, 'an uppercase letter'],
+    [/[0-9]/, 'a number'],
+    [/[^A-Za-z0-9]/, 'a symbol such as ! or -'],
+  ]
+    .filter(([pattern]) => !pattern.test(v))
+    .map(([, label]) => label);
+  if (missing.length)
+    throw new Problem(
+      `Make your password stronger: add ${missing.join(', ').replace(/, ([^,]*)$/, ' and $1')}.`,
+    );
+  return v;
+}
 export function password(value) {
   if (typeof value !== 'string' || value.length < 12 || value.length > 128)
     throw new Problem('Use a password of 12 to 128 characters.');
