@@ -433,6 +433,10 @@ async function get(path, url, me, request) {
   if (path === 'lost-found') {
     const filter = url.searchParams.get('kind') || '';
     if (filter) v.choice(filter, ['lost', 'found', 'returned', 'archived'], 'notice filter');
+    // Search matches the item, its description, or where it was lost or found.
+    const query = v.text(url.searchParams.get('q') || '', 'Search', 0, 80);
+    const pattern = '%' + query.replace(/[!%_]/g, (character) => '!' + character) + '%';
+    const order = url.searchParams.get('sort') === 'oldest' ? 'ASC' : 'DESC';
     // Unreturned notices past their active window are listed only under Archived.
     const cutoff = now() - LOST_FOUND_DAYS * 86400;
     const rows = await all(
@@ -441,7 +445,8 @@ async function get(path, url, me, request) {
         OR (?='returned' AND returned=1)
         OR (?='archived' AND returned=0 AND created<=?)
         OR (kind=? AND returned=0 AND created>?)
-      ) ORDER BY created DESC,id DESC LIMIT 21 OFFSET ${page.offset}`,
+      ) AND (?='' OR item LIKE ? ESCAPE '!' OR details LIKE ? ESCAPE '!' OR location LIKE ? ESCAPE '!')
+      ORDER BY created ${order},id ${order} LIMIT 21 OFFSET ${page.offset}`,
       me?.id || 0,
       filter,
       cutoff,
@@ -450,6 +455,10 @@ async function get(path, url, me, request) {
       cutoff,
       filter,
       cutoff,
+      query,
+      pattern,
+      pattern,
+      pattern,
     );
     return json(
       paginated(

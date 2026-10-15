@@ -16,6 +16,7 @@ import {
   TextArea,
   Select,
   Upload,
+  Search,
   date,
 } from '../ui/ui';
 import { api } from '@/services/api';
@@ -27,9 +28,11 @@ import type { Notice, Result } from '@shared/types';
 export function LostFoundPage() {
   const { user, auth, version } = useTechCare();
   const [page, setPage] = useState(1),
-    [filter, setFilter] = useState('');
+    [filter, setFilter] = useState(''),
+    [query, setQuery] = useState(''),
+    [sort, setSort] = useState<'newest' | 'oldest'>('newest');
   const result = useData<{ reports: Notice[]; hasMore: boolean }>(
-    'lost-found?page=' + page + '&kind=' + filter,
+    `lost-found?page=${page}&kind=${filter}&q=${encodeURIComponent(query)}&sort=${sort}`,
     version + (user?.id || 0),
   );
   return (
@@ -56,6 +59,36 @@ export function LostFoundPage() {
         </p>
       </div>
       {user && <ItemInquiries />}
+      <div className="lost-found-filters">
+        <Search
+          value={query}
+          placeholder="Search by item, description, or location…"
+          onSearch={(value) => {
+            setQuery(value.trim());
+            setPage(1);
+          }}
+        />
+        <div className="filter-tabs" aria-label="Sort item notices">
+          {(
+            [
+              ['newest', 'Newest first'],
+              ['oldest', 'Oldest first'],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              aria-pressed={sort === key}
+              className={sort === key ? 'active' : ''}
+              onClick={() => {
+                setSort(key);
+                setPage(1);
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="filter-tabs" aria-label="Filter item notices">
         {[
           ['', 'All notices'],
@@ -88,8 +121,10 @@ export function LostFoundPage() {
           ))}
         </div>
       ) : (
-        <Empty title="No notices here yet">
-          Reviewed reports will appear here. Try another filter or report an item.
+        <Empty title={query ? `No notices match “${query}”` : 'No notices here yet'}>
+          {query
+            ? 'Check the spelling, try a shorter word such as the item type, or choose another filter.'
+            : 'Reviewed reports will appear here. Try another filter or report an item.'}
         </Empty>
       )}
       <Pagination page={page} hasMore={result.data?.hasMore || false} onPage={setPage} />

@@ -350,6 +350,25 @@ try {
       (await call('lost-found?kind=archived')).data.reports.map((r) => r.id),
       [old],
     );
+    // Search covers item, description, and location; sort flips the date order.
+    const add = (item, location, ago) =>
+      Number(
+        run(
+          "INSERT INTO lost_found(user_id,kind,item,details,location,status,created,photos) VALUES(?,'lost',?,'Blue case with stickers.',?,'published',?,'[]')",
+          ids.member,
+          item,
+          location,
+          now() - ago,
+        ).lastInsertRowid,
+      );
+    const earbuds = add('Wireless earbuds', 'Gym lobby', 7200),
+      charger = add('Laptop charger', 'Room 204', 3600);
+    const ids_ = async (query) => (await call('lost-found?' + query)).data.reports.map((r) => r.id);
+    assert.deepEqual(await ids_('q=earbuds'), [earbuds]);
+    assert.deepEqual(await ids_('q=room%20204'), [charger]);
+    assert.deepEqual(await ids_('q=stickers'), [charger, earbuds]);
+    assert.deepEqual(await ids_('q=stickers&sort=oldest'), [earbuds, charger]);
+    assert.deepEqual(await ids_('q=100%25'), [], 'a % is matched literally');
   });
   await test('content reports are staff-only and removal revokes public access', async () => {
     assert.equal(
