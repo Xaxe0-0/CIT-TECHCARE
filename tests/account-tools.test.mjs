@@ -304,25 +304,36 @@ try {
       assert.equal((await call(name + '.csv', null, sessions.admin)).status, 200, name);
   });
 
-  await test('members delete their account; personal data goes and public posts remain', async () => {
+  await test('only admins delete accounts; personal data goes and public posts remain', async () => {
     const next = 'Another-synthetic-password';
     const kept = one(
       'SELECT id FROM posts WHERE user_id=? AND status=?',
       ids.member,
       'published',
     ).id;
+    assert.equal((await call('account/delete', { password: next }, sessions.member)).status, 404);
+    for (const session of [sessions.member, sessions.moderator])
+      assert.equal(
+        (await call('admin/delete-account', { id: ids.other }, session)).status,
+        403,
+        'members and moderators cannot delete accounts',
+      );
     assert.equal(
-      (await call('account/delete', { password: 'wrong-password-x' }, sessions.member)).status,
-      400,
-    );
-    assert.equal(
-      (await call('account/delete', { password: pw }, sessions.admin)).status,
+      (await call('admin/delete-account', { id: ids.admin }, sessions.admin)).status,
       403,
       'administrators are protected',
     );
-    const deleted = await call('account/delete', { password: next }, sessions.member);
+    const deleted = await call(
+      'admin/delete-account',
+      { id: ids.member, reason: 'Asked at the booth' },
+      sessions.admin,
+    );
     assert.equal(deleted.status, 200);
-    assert.match(deleted.response.headers.get('set-cookie'), /Max-Age=0/);
+    assert.equal(one('SELECT COUNT(*) AS n FROM sessions WHERE user_id=?', ids.member).n, 0);
+    assert.equal(
+      one("SELECT reason FROM audit WHERE action='delete' AND target=?", ids.member).reason,
+      'Asked at the booth',
+    );
     const u = one('SELECT name,email,bio,verified FROM users WHERE id=?', ids.member);
     assert.deepEqual(
       { ...u },

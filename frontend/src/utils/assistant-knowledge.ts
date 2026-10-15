@@ -51,14 +51,13 @@ export const helpTopics: HelpTopic[] = [
     question: 'How do I delete my account?',
     matches: [/\b(delete|remove|erase|close)\b.*\b(account|data)\b/],
     answer:
-      'You can delete your account yourself from My Dashboard. Your name, email, profile, connections, and private messages are removed; your public questions and comments stay, credited to “Deleted member”. I cannot delete your account for you.',
+      'Accounts are deleted by a TechCare administrator, not from your own dashboard. Your email, profile, connections, and private messages are removed; your public questions and comments stay, credited to “Deleted member”. I cannot delete your account for you.',
     steps: [
-      'Sign in and open My Dashboard.',
-      'Under Account settings, open Delete account and enter your current password.',
-      'Choose Permanently delete my account. This cannot be undone.',
+      'Contact a TechCare administrator or visit the support booth and ask for your account to be deleted.',
+      'The administrator deletes it from the Admin page. This cannot be undone.',
       'Administrator accounts are protected and are removed by the operating team instead.',
     ],
-    link: { href: '/profile', label: 'Open My Dashboard' },
+    link: { href: '/booth', label: 'Find the support booth' },
   },
   {
     id: 'recovery',

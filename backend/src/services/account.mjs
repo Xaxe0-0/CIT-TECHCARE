@@ -94,15 +94,19 @@ export async function confirmEmailChange(d, me) {
 }
 
 // Removes personal data and access. Public questions and comments stay, credited to "Deleted member".
-export async function deleteAccount(d, me) {
-  requireUser(me);
-  await confirmPassword(me, d.password);
-  if (me.role === 'admin')
+// Members cannot delete their own account; they ask an administrator, who deletes it here.
+// Personal data goes, public posts stay credited to "Deleted member". Administrators are protected.
+export async function deleteMember(d, me) {
+  requireUser(me, ['admin']);
+  const id = v.id(d.id),
+    reason = v.text(d.reason || '', 'Reason', 0, 500);
+  const target = await one('SELECT id,role,avatar FROM users WHERE id=?', id);
+  if (!target) throw new Problem('Account not found.', 404);
+  if (target.role === 'admin')
     throw new Problem(
       'Administrator accounts are protected. Use the approved operator procedure.',
       403,
     );
-  const id = me.id;
   await transaction(async () => {
     await run(
       "UPDATE users SET name='Deleted member',email=?,hash='!',bio='',avatar='',visibility='private',verified=0,role='member' WHERE id=?",
@@ -127,7 +131,14 @@ export async function deleteAccount(d, me) {
       id,
       id,
     );
+    await run(
+      "INSERT INTO audit(actor,action,kind,target,reason,created) VALUES(?,'delete','user',?,?,?)",
+      me.id,
+      id,
+      reason,
+      now(),
+    );
   });
-  if (me.avatar) await discardProfileMedia(me.avatar, id);
-  return { message: 'Your account has been deleted.' };
+  if (target.avatar) await discardProfileMedia(target.avatar, id);
+  return { message: 'The account has been deleted.' };
 }

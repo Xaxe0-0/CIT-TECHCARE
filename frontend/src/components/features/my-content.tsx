@@ -1,6 +1,5 @@
 'use client';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Image as ImageIcon } from '@phosphor-icons/react';
 import { useTechCare } from '@/context/techcare-context';
@@ -130,7 +129,6 @@ export function MyReports({ reports, changed }: { reports: OwnReport[]; changed:
 
 export function AccountSettings() {
   const { user, setUser, notify, classroom } = useTechCare();
-  const router = useRouter();
   const [emailStep, setEmailStep] = useState<'request' | 'confirm'>('request');
   const [demoCode, setDemoCode] = useState('');
   return (
@@ -221,36 +219,11 @@ export function AccountSettings() {
           </Form>
         )}
       </details>
-      <details>
-        <summary>Delete account</summary>
-        {user?.role === 'admin' ? (
-          <p className="form-hint">
-            Administrator accounts are protected. Use the approved operator procedure.
-          </p>
-        ) : (
-          <Form
-            submit="Permanently delete my account"
-            onSubmit={async (values) => {
-              const r = await api<Result>('account/delete', values);
-              setUser(null);
-              router.push('/');
-              notify(r.message!);
-            }}
-          >
-            <p>
-              This removes your name, email, profile, connections, and private messages. Your public
-              questions and comments stay, credited to “Deleted member”. This cannot be undone.
-            </p>
-            <Field
-              label="Current password"
-              name="password"
-              type="password"
-              max={128}
-              autoComplete="current-password"
-            />
-          </Form>
-        )}
-      </details>
+      <p className="form-hint">
+        To close your account, ask a TechCare administrator. They remove your email, profile,
+        connections, and private messages; your public questions and comments stay, credited to
+        “Deleted member”.
+      </p>
     </section>
   );
 }

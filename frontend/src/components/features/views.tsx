@@ -802,7 +802,8 @@ function Admin() {
 function AdminAppSettings() {
   const { user, version, refresh, notify } = useTechCare(),
     [busy, setBusy] = useState<number | null>(null),
-    [suspending, setSuspending] = useState<User | null>(null);
+    [suspending, setSuspending] = useState<User | null>(null),
+    [deleting, setDeleting] = useState<User | null>(null);
   const [query, setQuery] = useState('');
   async function restore(u: User) {
     setBusy(u.id);
@@ -905,6 +906,13 @@ function AdminAppSettings() {
                     >
                       {u.suspended ? 'Restore' : 'Suspend'}
                     </button>
+                    <button
+                      disabled={busy !== null}
+                      className="button secondary small danger"
+                      onClick={() => setDeleting(u)}
+                    >
+                      Delete
+                    </button>
                   </>
                 )}
               </div>
@@ -946,6 +954,31 @@ function AdminAppSettings() {
                 suspended: true,
               });
               setSuspending(null);
+              notify(r.message!);
+              refresh();
+            }}
+          >
+            <TextArea
+              label="Reason (kept in the activity log)"
+              name="reason"
+              max={500}
+              required={false}
+            />
+          </Form>
+        </Modal>
+      )}
+      {deleting && (
+        <Modal
+          title={'Delete ' + deleting.name + '?'}
+          description="Their email, profile, connections, and private messages are removed and they are signed out. Public questions and comments stay, credited to “Deleted member”. This cannot be undone."
+          onClose={() => setDeleting(null)}
+        >
+          <Form
+            submit="Delete account permanently"
+            cancel={{ label: 'Keep account', onClick: () => setDeleting(null) }}
+            onSubmit={async (values) => {
+              const r = await api<Result>('admin/delete-account', { ...values, id: deleting.id });
+              setDeleting(null);
               notify(r.message!);
               refresh();
             }}

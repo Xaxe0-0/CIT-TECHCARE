@@ -15,7 +15,7 @@ import {
   changePassword,
   requestEmailChange,
   confirmEmailChange,
-  deleteAccount,
+  deleteMember,
 } from '../services/account.mjs';
 import { setSuspended, auditLog, feedbackSummary, exportCsv } from '../services/admin-tools.mjs';
 import { randomInt } from 'node:crypto';
@@ -168,7 +168,7 @@ export async function handle(request) {
         'admin/suspend',
         'account/password',
         'account/email/verify',
-        'account/delete',
+        'admin/delete-account',
       ].includes(path)
         ? 'session'
         : ['admin/logo', 'admin/hero'].includes(path)
@@ -879,8 +879,7 @@ async function post(path, d, me, request) {
   if (path === 'account/password') return json(await changePassword(d, me, request));
   if (path === 'account/email') return json(await requestEmailChange(d, me, demo));
   if (path === 'account/email/verify') return json(await confirmEmailChange(d, me));
-  if (path === 'account/delete')
-    return json(await deleteAccount(d, me), 200, { 'Set-Cookie': cookie('', true) });
+  if (path === 'admin/delete-account') return json(await deleteMember(d, me));
   if (path === 'admin/suspend') return json(await setSuspended(d, me));
   if (path === 'comments') return json(await saveComment(d, me), 201);
   if (path === 'feedback') {
