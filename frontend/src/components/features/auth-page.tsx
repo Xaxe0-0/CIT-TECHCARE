@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Field, Form, PASSWORD_RULE, Success } from '../ui/ui';
+import { Field, Form, Success } from '../ui/ui';
 import { api } from '@/services/api';
 import { useData } from '@/hooks/use-data';
 import { useTechCare } from '@/context/techcare-context';
@@ -189,7 +189,7 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
         {['login', 'register', 'reset'].includes(mode) && (
           <Field
             label={mode === 'reset' ? 'New password' : 'Password'}
-            hint={mode === 'login' ? undefined : PASSWORD_RULE}
+            checklist={mode !== 'login'}
             name="password"
             type="password"
             min={12}

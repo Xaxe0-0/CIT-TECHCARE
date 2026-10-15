@@ -191,3 +191,31 @@
   color: var(--danger);
   font-weight: 700;
 }
+
+/* Live password rules under new-password fields: grey until met, then green with a check.
+   --success matches the green of the site's success messages in each theme. */
+:root {
+  --success: #2f7a55;
+}
+:root[data-theme='dark'] {
+  --success: #a1e6bb;
+}
+.password-checklist {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+  color: var(--muted);
+}
+.password-checklist li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: color 160ms ease;
+}
+.password-checklist li.met {
+  color: var(--success);
+  font-weight: 600;
+}

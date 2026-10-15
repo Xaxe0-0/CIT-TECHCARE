@@ -15,6 +15,7 @@ import {
   X,
   WarningCircle,
   CheckCircle,
+  Circle,
   MagnifyingGlass,
   ChatCircleDots,
   ImageSquare,
@@ -319,8 +320,13 @@ function RequiredMark() {
   );
 }
 // Must match newPassword() in backend/src/validations/validation.mjs.
-export const PASSWORD_RULE =
-  'At least 12 characters, including an uppercase letter, a lowercase letter, a number, and a symbol such as ! or -.';
+const PASSWORD_RULES: { label: string; met: (value: string) => boolean }[] = [
+  { label: 'At least 12 characters', met: (v) => v.length >= 12 },
+  { label: 'An uppercase letter (A–Z)', met: (v) => /[A-Z]/.test(v) },
+  { label: 'A lowercase letter (a–z)', met: (v) => /[a-z]/.test(v) },
+  { label: 'A number (0–9)', met: (v) => /[0-9]/.test(v) },
+  { label: 'A symbol such as ! or -', met: (v) => /[^A-Za-z0-9]/.test(v) },
+];
 export function Field({
   label,
   name,
@@ -334,11 +340,14 @@ export function Field({
   pattern,
   inputMode,
   hint,
+  checklist = false,
 }: {
   label: string;
   name: string;
-  // Guidance shown under the input, such as password rules.
+  // Guidance shown under the input.
   hint?: string;
+  // New passwords: a live list of the password rules that turn green as each one is met.
+  checklist?: boolean;
   type?: HTMLInputTypeAttribute;
   min?: number;
   max?: number;
@@ -351,6 +360,7 @@ export function Field({
 }) {
   const { error, id, errorId } = useFieldError(name);
   const [shown, setShown] = useState(false);
+  const [typed, setTyped] = useState('');
   const password = type === 'password';
   const input = (
     <input
@@ -358,7 +368,8 @@ export function Field({
       id={id}
       aria-invalid={!!error}
       aria-describedby={
-        [hint && `${id}-hint`, error && errorId].filter(Boolean).join(' ') || undefined
+        [(hint || checklist) && `${id}-hint`, error && errorId].filter(Boolean).join(' ') ||
+        undefined
       }
       pattern={pattern}
       inputMode={inputMode}
@@ -371,6 +382,7 @@ export function Field({
       defaultValue={value}
       placeholder={placeholder}
       autoComplete={autoComplete}
+      onInput={checklist ? (event) => setTyped(event.currentTarget.value) : undefined}
     />
   );
   return (
@@ -402,6 +414,24 @@ export function Field({
         <small className="field-hint" id={`${id}-hint`}>
           {hint}
         </small>
+      )}
+      {checklist && (
+        <ul className="password-checklist" id={`${id}-hint`}>
+          {PASSWORD_RULES.map((rule) => {
+            const met = rule.met(typed);
+            return (
+              <li key={rule.label} className={met ? 'met' : undefined}>
+                {met ? (
+                  <CheckCircle size={18} weight="fill" aria-hidden="true" />
+                ) : (
+                  <Circle size={18} aria-hidden="true" />
+                )}
+                {rule.label}
+                <span className="sr-only">{met ? ' (done)' : ' (still needed)'}</span>
+              </li>
+            );
+          })}
+        </ul>
       )}
       <FieldError id={errorId} error={error} />
     </label>
