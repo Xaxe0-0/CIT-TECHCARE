@@ -3,6 +3,7 @@ import { Problem, requireUser, blocked, throttle } from '../middleware/auth.mjs'
 import * as v from '../validations/validation.mjs';
 import { saveMedia, discardCommunityMedia, discardQuestionMedia } from './media.mjs';
 import { voteColumns } from './discussion.mjs';
+import { logActivity } from './admin-tools.mjs';
 
 const staff = ['admin', 'moderator'];
 // Notices older than this leave the active lists and move to Archived.
@@ -87,6 +88,7 @@ export async function savePost(d, me) {
     throw error;
   }
   for (const url of saved) if (!photos.includes(url)) await discardQuestionMedia(url, me.id);
+  await logActivity(me.id, editing ? 'question-edited' : 'question-posted', 'post', id);
   return {
     ok: true,
     id,
@@ -248,6 +250,7 @@ export async function saveComment(d, me) {
     throw error;
   }
   if (editing?.photo && editing.photo !== photo) await discardCommunityMedia(editing.photo, me.id);
+  if (!editing) await logActivity(me.id, 'comment-posted', 'comment', id);
   return {
     id,
     message: removing
@@ -316,6 +319,7 @@ export async function saveLost(d, me) {
       );
     if (editing && photos.length)
       for (const url of JSON.parse(editing.photos)) await discardCommunityMedia(url, me.id);
+    if (!editing) await logActivity(me.id, 'notice-posted', 'lost-found', id);
     return {
       id,
       message: editing

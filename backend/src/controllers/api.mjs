@@ -17,7 +17,13 @@ import {
   confirmEmailChange,
   deleteMember,
 } from '../services/account.mjs';
-import { setSuspended, auditLog, feedbackSummary, exportCsv } from '../services/admin-tools.mjs';
+import {
+  setSuspended,
+  auditLog,
+  feedbackSummary,
+  exportCsv,
+  logActivity,
+} from '../services/admin-tools.mjs';
 import { randomInt } from 'node:crypto';
 import { CONSENT_COOKIE, CONSENT_VERSION, hasConsent } from '../../../shared/src/consent.mjs';
 import { all, one, run, now, transaction, useMySQL } from '../config/db.mjs';
@@ -616,6 +622,8 @@ async function post(path, d, me, request) {
         time + 900,
         time,
       );
+      const id = Number(result.lastInsertRowid);
+      await logActivity(id, 'sign-up', 'user', id);
     });
     return json(
       {
@@ -643,6 +651,7 @@ async function post(path, d, me, request) {
     await transaction(async () => {
       await run('UPDATE users SET verified=1 WHERE id=?', r.id);
       await run('DELETE FROM email_verifications WHERE user_id=?', r.id);
+      await logActivity(r.id, 'email-verified', 'user', r.id);
     });
     return json({ ok: true, message: 'Email verified. You can now sign in.' });
   }
@@ -717,7 +726,11 @@ async function post(path, d, me, request) {
         await run('DELETE FROM rate_limits WHERE key=?', failKey);
         await run('INSERT INTO rate_limits VALUES(?,?,?)', failKey, count, time + LOGIN_LOCK);
       }
-      if (count >= LOGIN_TRIES) throw locked(time + LOGIN_LOCK);
+      if (count >= LOGIN_TRIES) {
+        if (u)
+          await logActivity(u.id, 'sign-in-locked', 'user', u.id, `${LOGIN_TRIES} wrong passwords`);
+        throw locked(time + LOGIN_LOCK);
+      }
       const left = LOGIN_TRIES - count;
       throw new Problem(
         `Invalid email or password. ${left} ${left === 1 ? 'try' : 'tries'} left before sign-in is locked for 15 minutes.`,
@@ -728,6 +741,7 @@ async function post(path, d, me, request) {
     if (!u.verified) throw new Problem('Verify your email before signing in.', 403);
     if (u.suspended)
       throw new Problem('This account is suspended. Contact the project team for help.', 403);
+    await logActivity(u.id, 'sign-in', 'user', u.id);
     const token = issueJWT(u.id, time);
     await run('DELETE FROM sessions WHERE expires<=?', time);
     await run('INSERT INTO sessions VALUES(?,?,?)', digest(token), u.id, time + 604800);
@@ -792,6 +806,7 @@ async function post(path, d, me, request) {
       await run('DELETE FROM password_resets WHERE user_id=?', r.user_id);
       const owner = await one('SELECT email FROM users WHERE id=?', r.user_id);
       await run('DELETE FROM rate_limits WHERE key=?', `login-fail:${owner.email}`);
+      await logActivity(r.user_id, 'password-reset', 'user', r.user_id);
       await run('DELETE FROM sessions WHERE user_id=?', r.user_id);
     });
     return json({ message: 'Password updated. Sign in with your new password.' }, 200, {
@@ -827,6 +842,7 @@ async function post(path, d, me, request) {
       avatar,
       me.id,
     );
+    await logActivity(me.id, 'profile-updated', 'user', me.id);
     // Replaced pictures would otherwise count against the upload allowance forever.
     if (avatar !== me.avatar) await discardProfileMedia(me.avatar, me.id);
     return json({ user: ownUser(await one('SELECT * FROM users WHERE id=?', me.id)) });

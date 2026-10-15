@@ -1056,9 +1056,34 @@ function DataExports() {
   );
 }
 
+const logFilters = [
+  ['', 'Everything'],
+  ['staff', 'Staff decisions'],
+  ['account', 'Accounts & security'],
+  ['activity', 'Member posts'],
+] as const;
+// Readable names for logged actions; anything else (staff decisions) is shown as stored.
+const actionNames: Record<string, string> = {
+  'sign-up': 'Signed up',
+  'email-verified': 'Verified email',
+  'sign-in': 'Signed in',
+  'sign-in-locked': 'Sign-in locked',
+  'password-changed': 'Changed password',
+  'password-reset': 'Reset password',
+  'email-changed': 'Changed email',
+  'profile-updated': 'Updated profile',
+  'question-posted': 'Posted a question',
+  'question-edited': 'Edited a question',
+  'comment-posted': 'Posted a comment',
+  'notice-posted': 'Posted a Lost & Found notice',
+  delete: 'Deleted account',
+  suspend: 'Suspended account',
+  restore: 'Restored account',
+};
 function ActivityLog() {
   const { version } = useTechCare();
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(1),
+    [type, setType] = useState('');
   const result = useData<{
     entries: {
       id: number;
@@ -1070,11 +1095,28 @@ function ActivityLog() {
       name: string;
     }[];
     hasMore: boolean;
-  }>('admin/audit?page=' + page, version);
+  }>(`admin/audit?page=${page}&type=${type}`, version);
   return (
     <section className="panel activity-log">
       <h2>Activity log</h2>
-      <p>Staff decisions and account changes, newest first.</p>
+      <p>
+        Staff decisions, sign-ins and other account changes, and new member posts, newest first.
+      </p>
+      <div className="filter-tabs" aria-label="Filter the activity log">
+        {logFilters.map(([key, label]) => (
+          <button
+            key={key}
+            aria-pressed={type === key}
+            className={type === key ? 'active' : ''}
+            onClick={() => {
+              setType(key);
+              setPage(1);
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
       {result.loading ? (
         <Loading />
       ) : result.error ? (
@@ -1085,7 +1127,7 @@ function ActivityLog() {
             <thead>
               <tr>
                 <th scope="col">When</th>
-                <th scope="col">Staff</th>
+                <th scope="col">Who</th>
                 <th scope="col">Action</th>
                 <th scope="col">Target</th>
                 <th scope="col">Reason</th>
@@ -1094,9 +1136,9 @@ function ActivityLog() {
             <tbody>
               {result.data.entries.map((e) => (
                 <tr key={e.id}>
-                  <td>{date(e.created)}</td>
+                  <td>{new Date(e.created * 1000).toLocaleString()}</td>
                   <td>{e.name}</td>
-                  <td>{e.action}</td>
+                  <td>{actionNames[e.action] || e.action}</td>
                   <td>
                     {e.kind} #{e.target}
                   </td>
@@ -1107,7 +1149,7 @@ function ActivityLog() {
           </table>
         </div>
       ) : (
-        <p className="muted">No staff activity yet.</p>
+        <p className="muted">Nothing has been logged here yet.</p>
       )}
       <Pagination page={page} hasMore={result.data?.hasMore || false} onPage={setPage} />
     </section>

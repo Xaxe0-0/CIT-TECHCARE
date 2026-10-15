@@ -13,6 +13,7 @@ import {
 import * as v from '../validations/validation.mjs';
 import { sendMail, codeEmail } from './mail.mjs';
 import { discardProfileMedia } from './media.mjs';
+import { logActivity } from './admin-tools.mjs';
 
 // Every account change re-checks the password and shares one per-account attempt limit.
 async function confirmPassword(me, password) {
@@ -30,6 +31,7 @@ export async function changePassword(d, me, request) {
   const hash = passwordHash(password);
   await transaction(async () => {
     await run('UPDATE users SET hash=? WHERE id=?', hash, me.id);
+    await logActivity(me.id, 'password-changed', 'user', me.id);
     await run('DELETE FROM password_resets WHERE user_id=?', me.id);
     await run(
       'DELETE FROM sessions WHERE user_id=? AND token_hash<>?',
@@ -88,6 +90,7 @@ export async function confirmEmailChange(d, me) {
   }
   await transaction(async () => {
     await run('UPDATE users SET email=? WHERE id=?', change.email, me.id);
+    await logActivity(me.id, 'email-changed', 'user', me.id);
     await run('DELETE FROM email_changes WHERE user_id=?', me.id);
   });
   return {

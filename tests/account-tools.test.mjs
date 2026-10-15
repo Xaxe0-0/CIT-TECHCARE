@@ -268,7 +268,13 @@ try {
     await call('admin/suspend', { id: ids.other, suspended: false }, sessions.admin);
     sessions.other = await login('other@example.test');
     assert.equal(typeof sessions.other, 'string');
-    const log = (await call('admin/audit', null, sessions.admin)).data.entries;
+    const log = (await call('admin/audit?type=staff', null, sessions.admin)).data.entries;
+    // Account and security events have their own filter and never count as staff decisions.
+    const account = (await call('admin/audit?type=account', null, sessions.admin)).data.entries;
+    assert.ok(account.some((e) => e.action === 'sign-in' && e.target === ids.other));
+    assert.ok(account.some((e) => e.action === 'password-changed'));
+    assert.ok(!log.some((e) => e.action === 'sign-in'));
+    assert.equal((await call('admin/audit?type=nonsense', null, sessions.admin)).status, 400);
     assert.deepEqual(
       log.slice(0, 2).map((e) => [e.action, e.target, e.reason]),
       [
