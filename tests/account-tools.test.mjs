@@ -352,6 +352,20 @@ try {
     assert.equal(await login('member.new@example.test', next), 401);
   });
 
+  await test('three wrong passwords lock sign-in for 15 minutes', async () => {
+    const email = 'other@example.test',
+      key = 'login-fail:' + email;
+    assert.equal(await login(email, 'Wrong-password-one'), 401);
+    const second = await call('login', { email, password: 'Wrong-password-two' });
+    assert.match(second.data.error, /1 try left/);
+    assert.equal(await login(email, 'Wrong-password-three'), 429);
+    assert.equal(await login(email), 429, 'even the right password waits for the lock');
+    assert.ok(one('SELECT expires FROM rate_limits WHERE key=?', key).expires - now() > 890);
+    run('UPDATE rate_limits SET expires=? WHERE key=?', now() - 1, key);
+    assert.equal(typeof (await login(email)), 'string', 'the lock ends after 15 minutes');
+    assert.equal(one('SELECT 1 AS x FROM rate_limits WHERE key=?', key), undefined);
+  });
+
   await test('sign-up rejects email domains that cannot receive mail', async (t) => {
     const answers = {
       'gmail.com': [{ exchange: 'gmail-smtp-in.l.google.com', priority: 5 }],

@@ -56,6 +56,9 @@ import { assistantEnabled, streamAnswer } from '../services/assistant.mjs';
 const json = (payload, status = 200, headers = {}) =>
   Response.json(payload, { status, headers: { 'Cache-Control': 'no-store', ...headers } });
 const staff = ['moderator', 'admin'];
+// Sign-in: wrong passwords allowed before the address is locked, and the lock length in seconds.
+const LOGIN_TRIES = 3,
+  LOGIN_LOCK = 900;
 const audit = async (user, action, kind, target, reason = '') =>
   await run(
     'INSERT INTO audit(actor,action,kind,target,reason,created) VALUES(?,?,?,?,?,?)',
@@ -667,11 +670,43 @@ async function post(path, d, me, request) {
     const email = v.email(d.email),
       password = v.password(d.password),
       u = await one('SELECT * FROM users WHERE email=?', email);
+    // Three wrong passwords lock the address for 15 minutes; a correct one or a reset clears it.
+    const failKey = `login-fail:${email}`,
+      failures = await one(
+        'SELECT count,expires FROM rate_limits WHERE key=? AND expires>?',
+        failKey,
+        time,
+      );
+    const locked = (until) =>
+      new Problem(
+        `Too many wrong passwords. Try again in ${Math.ceil((until - time) / 60)} minutes, or reset your password.`,
+        429,
+      );
+    if (failures && failures.count >= LOGIN_TRIES) throw locked(failures.expires);
     // Equal-cost check when the account is absent.
     if (
       !passwordOK(password, u?.hash || `pbkdf2_sha256$600000$${'00'.repeat(16)}$${'00'.repeat(32)}`)
-    )
-      throw new Problem('Invalid email or password.', 401);
+    ) {
+      const count = (failures?.count || 0) + 1;
+      if (failures)
+        await run(
+          'UPDATE rate_limits SET count=?,expires=? WHERE key=?',
+          count,
+          time + LOGIN_LOCK,
+          failKey,
+        );
+      else {
+        await run('DELETE FROM rate_limits WHERE key=?', failKey);
+        await run('INSERT INTO rate_limits VALUES(?,?,?)', failKey, count, time + LOGIN_LOCK);
+      }
+      if (count >= LOGIN_TRIES) throw locked(time + LOGIN_LOCK);
+      const left = LOGIN_TRIES - count;
+      throw new Problem(
+        `Invalid email or password. ${left} ${left === 1 ? 'try' : 'tries'} left before sign-in is locked for 15 minutes.`,
+        401,
+      );
+    }
+    await run('DELETE FROM rate_limits WHERE key=?', failKey);
     if (!u.verified) throw new Problem('Verify your email before signing in.', 403);
     if (u.suspended)
       throw new Problem('This account is suspended. Contact the project team for help.', 403);
@@ -732,6 +767,8 @@ async function post(path, d, me, request) {
     await transaction(async () => {
       await run('UPDATE users SET hash=? WHERE id=?', hash, r.user_id);
       await run('DELETE FROM password_resets WHERE user_id=?', r.user_id);
+      const owner = await one('SELECT email FROM users WHERE id=?', r.user_id);
+      await run('DELETE FROM rate_limits WHERE key=?', `login-fail:${owner.email}`);
       await run('DELETE FROM sessions WHERE user_id=?', r.user_id);
     });
     return json({ message: 'Password updated. Sign in with your new password.' }, 200, {
