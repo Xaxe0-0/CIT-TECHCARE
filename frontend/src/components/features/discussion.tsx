@@ -211,7 +211,7 @@ function Byline({ item }: { item: Post | Reply }) {
       <Avatar user={item} />
       <strong>{item.name}</strong>
       {item.role !== 'member' && (
-        <Badge tone="brand">{item.role === 'admin' ? 'Administrator' : 'Moderator'}</Badge>
+        <Badge tone="role">{item.role === 'admin' ? 'Administrator' : 'Moderator'}</Badge>
       )}
       <span>· {date(item.created)}</span>
     </div>

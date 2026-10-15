@@ -75,7 +75,7 @@ export function Members() {
               <div className="member-heading">
                 <Avatar user={u} large />
                 {u.role !== 'member' && (
-                  <Badge tone="brand">{u.role === 'admin' ? 'Administrator' : 'Moderator'}</Badge>
+                  <Badge tone="role">{u.role === 'admin' ? 'Administrator' : 'Moderator'}</Badge>
                 )}
               </div>
               <h2>{u.name}</h2>
