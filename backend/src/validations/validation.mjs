@@ -28,6 +28,21 @@ export function email(value) {
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) throw new Problem('Enter a valid email address.');
   return v;
 }
+// TECHCARE_EMAIL_DOMAINS (comma-separated, e.g. "uls.edu.ph") limits new sign-ups and email
+// changes to those domains; empty allows any domain that can receive mail.
+export const allowedEmailDomains = () =>
+  (process.env.TECHCARE_EMAIL_DOMAINS || '')
+    .split(',')
+    .map((domain) => domain.trim().toLowerCase().replace(/^@/, ''))
+    .filter(Boolean);
+export function allowedEmail(email) {
+  const domains = allowedEmailDomains();
+  if (domains.length && !domains.includes(email.slice(email.lastIndexOf('@') + 1)))
+    throw new Problem(
+      `Use your school email address ending in ${domains.map((d) => '@' + d).join(' or ')}.`,
+    );
+  return email;
+}
 const resolver = new Resolver({ timeout: 3000, tries: 2 });
 // Rejects addresses whose domain cannot receive mail: no MX record (made-up domains such as
 // "dsadasdasd.com") or a "null MX" that refuses all mail. A DNS outage lets the address

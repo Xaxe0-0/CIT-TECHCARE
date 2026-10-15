@@ -360,6 +360,18 @@ try {
     assert.equal(await login('member.new@example.test', next), 401);
   });
 
+  await test('TECHCARE_EMAIL_DOMAINS limits sign-up to school addresses', async (t) => {
+    process.env.TECHCARE_EMAIL_DOMAINS = 'uls.edu.ph';
+    t.after(() => delete process.env.TECHCARE_EMAIL_DOMAINS);
+    const join = (email) =>
+      call('register', { name: 'School Student', email, password: 'Strong-enough-pass-1' });
+    const outside = await join('student@gmail.com');
+    assert.equal(outside.status, 400);
+    assert.match(outside.data.error, /ending in @uls\.edu\.ph/);
+    assert.equal((await join('student@uls.edu.ph')).status, 201);
+    assert.deepEqual((await call('settings')).data.emailDomains, ['uls.edu.ph']);
+  });
+
   await test('three wrong passwords lock sign-in for 15 minutes', async () => {
     const email = 'other@example.test',
       key = 'login-fail:' + email;

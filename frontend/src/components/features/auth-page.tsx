@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Field, Form, PASSWORD_RULE, Success } from '../ui/ui';
 import { api } from '@/services/api';
+import { useData } from '@/hooks/use-data';
 import { useTechCare } from '@/context/techcare-context';
 import { authPaths, type AuthMode } from '@/utils/auth-pages';
 import type { Result, FormValues } from '@shared/types';
@@ -15,6 +16,10 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
   const { setUser, notify, classroom, authDraft, updateAuthDraft } = useTechCare(),
     router = useRouter();
   const { email, code, token, message, sentAt } = authDraft;
+  // Set when the server limits sign-ups to school email domains (TECHCARE_EMAIL_DOMAINS).
+  const schoolDomains =
+    useData<{ emailDomains?: string[] }>(mode === 'register' ? 'settings' : null).data
+      ?.emailDomains || [];
   const [now, setNow] = useState(() => Date.now());
   const [resending, setResending] = useState(false);
   const [resendError, setResendError] = useState('');
@@ -142,12 +147,24 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
         )}
         {mode !== 'reset' && (
           <Field
-            label="Email address"
+            label={
+              mode === 'register' && schoolDomains.length ? 'School email address' : 'Email address'
+            }
             name="email"
             type="email"
             max={160}
             value={email}
             autoComplete="email"
+            placeholder={
+              mode === 'register' && schoolDomains.length
+                ? `yourname@${schoolDomains[0]}`
+                : undefined
+            }
+            hint={
+              mode === 'register' && schoolDomains.length
+                ? `Only ${schoolDomains.map((domain) => '@' + domain).join(' or ')} addresses can join TechCare.`
+                : undefined
+            }
           />
         )}
         {['login', 'register', 'reset'].includes(mode) && (

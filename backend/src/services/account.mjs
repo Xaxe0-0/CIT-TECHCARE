@@ -43,7 +43,7 @@ export async function changePassword(d, me, request) {
 export async function requestEmailChange(d, me, demo) {
   requireUser(me);
   await confirmPassword(me, d.password);
-  const email = v.email(d.email);
+  const email = v.allowedEmail(v.email(d.email));
   if (email === me.email) throw new Problem('This is already your account email.');
   if (await one('SELECT id FROM users WHERE email=?', email))
     throw new Problem('This email cannot be used. Try another address.', 409);

@@ -226,6 +226,7 @@ async function get(path, url, me, request) {
       assistantAI: assistantEnabled(),
       logo: (await one("SELECT value FROM settings WHERE key='logo'"))?.value || '',
       realtime: isRealtimeAvailable(),
+      emailDomains: v.allowedEmailDomains(),
     });
   if (path === 'branding-icon') {
     const logo = (await one("SELECT value FROM settings WHERE key='logo'"))?.value;
@@ -559,7 +560,7 @@ async function post(path, d, me, request) {
   }
   if (path === 'register') {
     const name = v.text(d.name, 'Display name', 2, 80),
-      email = v.email(d.email),
+      email = v.allowedEmail(v.email(d.email)),
       password = v.newPassword(d.password);
     if (await one('SELECT id FROM users WHERE email=?', email))
       throw new Problem(
