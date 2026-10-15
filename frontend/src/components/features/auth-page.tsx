@@ -1,16 +1,50 @@
 'use client';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { Field, Form, Success } from '../ui/ui';
 import { api } from '@/services/api';
 import { useTechCare } from '@/context/techcare-context';
 import { authPaths, type AuthMode } from '@/utils/auth-pages';
 import type { Result, FormValues } from '@shared/types';
 
+// The server accepts one new verification code per minute.
+const RESEND_SECONDS = 60;
+
 export function AuthPage({ mode }: { mode: AuthMode }) {
   const { setUser, notify, classroom, authDraft, updateAuthDraft } = useTechCare(),
     router = useRouter();
-  const { email, code, token, message } = authDraft;
+  const { email, code, token, message, sentAt } = authDraft;
+  const [now, setNow] = useState(() => Date.now());
+  const [resending, setResending] = useState(false);
+  const [resendError, setResendError] = useState('');
+  const wait = Math.max(0, Math.ceil(RESEND_SECONDS - (now - sentAt) / 1000));
+  useEffect(() => {
+    if (!wait) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [wait]);
+  // Uses the email field at the top of the form, so there is only one place to type it.
+  async function resend(button: HTMLButtonElement) {
+    const input = button.form?.elements.namedItem('email') as HTMLInputElement | null;
+    if (!input?.reportValidity()) return;
+    setResending(true);
+    setResendError('');
+    try {
+      const r = await api<Result>('resend-verification', { email: input.value });
+      updateAuthDraft({
+        email: input.value,
+        code: r.development_code || '',
+        message: r.message!,
+        sentAt: Date.now(),
+      });
+      setNow(Date.now());
+    } catch (error) {
+      setResendError((error as Error).message);
+    } finally {
+      setResending(false);
+    }
+  }
   const setEmail = (email: string) => updateAuthDraft({ email });
   const setCode = (code: string) => updateAuthDraft({ code });
   const setToken = (token: string) => updateAuthDraft({ token });
@@ -41,9 +75,9 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
       notify('Welcome back. Your dashboard is ready.');
     }
     if (mode === 'register') {
-      setCode(r.development_code || '');
+      updateAuthDraft({ code: r.development_code || '', message: r.message!, sentAt: Date.now() });
+      setNow(Date.now());
       setMode('verify');
-      setMessage(r.message!);
     }
     if (mode === 'verify') {
       setMode('login');
@@ -127,15 +161,36 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
           />
         )}
         {mode === 'verify' && (
-          <Field
-            label="Six-digit code"
-            name="code"
-            inputMode="numeric"
-            pattern="[0-9]{6}"
-            min={6}
-            max={6}
-            autoComplete="one-time-code"
-          />
+          <>
+            <Field
+              label="Six-digit code"
+              name="code"
+              inputMode="numeric"
+              pattern="[0-9]{6}"
+              min={6}
+              max={6}
+              autoComplete="one-time-code"
+            />
+            <div className="resend-code">
+              <button
+                type="button"
+                className="text-button"
+                disabled={resending || wait > 0}
+                onClick={(event) => void resend(event.currentTarget)}
+              >
+                {resending
+                  ? 'Sending…'
+                  : wait > 0
+                    ? `Send a new code in ${wait}s`
+                    : 'Send a new code'}
+              </button>
+              {resendError && (
+                <div className="error-message" role="alert">
+                  {resendError}
+                </div>
+              )}
+            </div>
+          </>
         )}
         {mode === 'reset' && (
           <Field
@@ -182,25 +237,6 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
               <Link className="text-button" href={authPaths.reset} onClick={() => setMessage('')}>
                 Reset password with a token
               </Link>
-            )}
-            {mode === 'verify' && (
-              <Form
-                submit="Send a new code"
-                onSubmit={async (values) => {
-                  setEmail(values.email);
-                  const r = await api<Result>('resend-verification', values);
-                  setCode(r.development_code || '');
-                  setMessage(r.message!);
-                }}
-              >
-                <Field
-                  label="Email for a new code"
-                  name="email"
-                  type="email"
-                  value={email}
-                  max={160}
-                />
-              </Form>
             )}
           </>
         )}
