@@ -143,7 +143,26 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
         onSubmit={submit}
       >
         {mode === 'register' && (
-          <Field label="Display name" name="name" min={2} max={80} autoComplete="name" />
+          <>
+            <Field
+              label="Full name"
+              name="full_name"
+              min={2}
+              max={80}
+              autoComplete="name"
+              hint="Kept private: only you and TechCare administrators can see it."
+            />
+            <Field
+              label="Username"
+              name="name"
+              min={3}
+              max={20}
+              pattern="[A-Za-z0-9_]{3,20}"
+              autoComplete="username"
+              placeholder="e.g. ana_reyes"
+              hint="3 to 20 letters, numbers, or underscores, with no spaces. This is the only name other members see."
+            />
+          </>
         )}
         {mode !== 'reset' && (
           <Field
@@ -221,8 +240,8 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
         )}
         {mode === 'register' && (
           <p className="form-hint">
-            Your display name appears with your public questions, comments, and replies. Please read
-            our <Link href="/privacy">privacy and community guidelines</Link>.
+            Your username appears with your public questions, comments, and replies. Please read our{' '}
+            <Link href="/privacy">privacy and community guidelines</Link>.
           </p>
         )}
       </Form>

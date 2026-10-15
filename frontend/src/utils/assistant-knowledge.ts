@@ -97,10 +97,10 @@ export const helpTopics: HelpTopic[] = [
     question: 'How do I create an account?',
     matches: [/\b(register|registration|signup|sign up|join|create account)\b/, /create.*account/],
     answer:
-      'Choose Create Account at the top of the page. You’ll need a display name, email, and a password of 12–128 characters. Verify your email, then sign in. Your display name appears with your public questions, comments, and replies.',
+      'Choose Create Account at the top of the page. You’ll need your full name (kept private), a username (the only name others see), your school email, and a password of at least 12 characters with an uppercase letter, a lowercase letter, a number, and a symbol. Enter the six-digit code we email you, then sign in.',
     steps: [
       'Select Create Account.',
-      'Fill in Display name, Email address, and Password, then submit.',
+      'Fill in Full name, Username, your school email address, and Password, then submit.',
       'Complete email verification using the six-digit code.',
       'Return to Sign In and use your email and password.',
     ],
@@ -171,7 +171,7 @@ export const helpTopics: HelpTopic[] = [
       /who can (see|read)|hide my|visible to/,
     ],
     answer:
-      'Your display name and published questions, comments, and replies are public. Questions are reviewed before publication; comments appear immediately. A private profile hides your bio and picture except from you and accepted friends. Feedback is staff-only but is not anonymous. This assistant does not inspect your profile or messages; its chat history stays in the tab’s memory.',
+      'Your username and published questions, comments, and replies are public. Questions are reviewed before publication; comments appear immediately. A private profile hides your bio and picture except from you and accepted friends. Feedback is staff-only but is not anonymous. This assistant does not inspect your profile or messages; its chat history stays in the tab’s memory.',
     steps: [
       'Open My Dashboard to change Profile visibility.',
       'Keep passwords, verification codes, and private identifiers out of public posts.',
@@ -183,13 +183,13 @@ export const helpTopics: HelpTopic[] = [
   {
     id: 'profile',
     question: 'How do I edit my profile?',
-    matches: [/\b(profile|dashboard|avatar|picture|bio|display name)\b/],
+    matches: [/\b(profile|dashboard|avatar|picture|bio|display name|username|full name)\b/],
     answer:
-      'Sign in and open My Dashboard to change your display name, profile visibility, bio, and picture. Select Save profile to apply changes.',
+      'Sign in and open My Dashboard to change your username, profile visibility, bio, and picture. Select Save profile to apply changes.',
     steps: [
       'Sign in, then choose My Dashboard in the navigation.',
-      'Edit Display name, Profile visibility, About me, or Profile picture.',
-      'Select Save profile and check the confirmation. A private profile still has a public display name and public approved posts.',
+      'Edit Username, Full name, Profile visibility, About me, or Profile picture.',
+      'Select Save profile and check the confirmation. A private profile still has a public username and public approved posts.',
     ],
     link: { href: '/profile', label: 'Open My Dashboard' },
   },

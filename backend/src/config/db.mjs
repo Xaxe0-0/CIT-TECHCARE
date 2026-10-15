@@ -81,13 +81,13 @@ export async function closeMySQLPool() {
 export async function assertDatabaseReady() {
   assertDatabaseConfig();
   try {
-    const latest = await one('SELECT version FROM migrations WHERE version=? LIMIT 1', 9);
+    const latest = await one('SELECT version FROM migrations WHERE version=? LIMIT 1', 10);
     if (!latest)
       throw new Error(
-        'MySQL schema is not at version 9. Apply backend/schema/mysql.sql to a new database, or the backend/schema/mysql-upgrade-*.sql files above its current version, in order.',
+        'MySQL schema is not at version 10. Apply backend/schema/mysql.sql to a new database, or the backend/schema/mysql-upgrade-*.sql files above its current version, in order.',
       );
   } catch (error) {
-    if (error.message?.includes('MySQL schema is not at version 9')) throw error;
+    if (error.message?.includes('MySQL schema is not at version 10')) throw error;
     if (error.code === 'ER_NO_SUCH_TABLE')
       throw new Error('MySQL schema is missing. Apply backend/schema/mysql.sql before startup.');
     if (error.code === 'ECONNREFUSED')
@@ -161,7 +161,7 @@ export function db() {
   const cached = globalThis.__techcareDBs.get(path);
   if (cached) {
     if (migratedConnections.has(cached)) return cached;
-    if (cached.prepare('SELECT 1 FROM migrations WHERE version=9').get()) {
+    if (cached.prepare('SELECT 1 FROM migrations WHERE version=10').get()) {
       migratedConnections.add(cached);
       return cached;
     }
@@ -356,6 +356,31 @@ export function db() {
           email TEXT NOT NULL, code_hash TEXT NOT NULL, expires INTEGER NOT NULL, attempts INTEGER NOT NULL DEFAULT 0);
       `);
       con.prepare('INSERT INTO migrations VALUES(9,?)').run(Math.floor(Date.now() / 1000));
+    }
+    if (!con.prepare('SELECT 1 FROM migrations WHERE version=10').get()) {
+      con.exec(`
+        ALTER TABLE users ADD COLUMN full_name TEXT NOT NULL DEFAULT '';
+        ALTER TABLE posts ADD COLUMN photos TEXT NOT NULL DEFAULT '[]';
+        UPDATE posts SET photos=json_array(photo) WHERE photo<>'';
+      `);
+      // users.name becomes the public username; the old display name moves to full_name.
+      // Matches mysql-upgrade-10.sql. Deleted accounts stay "Deleted member".
+      const taken = new Set();
+      for (const u of con
+        .prepare(
+          "SELECT id,name FROM users WHERE email NOT LIKE 'deleted-%@deleted.invalid' ORDER BY id",
+        )
+        .all()) {
+        let name = u.name
+          .toLowerCase()
+          .replace(/[^a-z0-9_]/g, '')
+          .slice(0, 20);
+        if (name.length < 3) name = `member_${u.id}`;
+        if (taken.has(name)) name = `${name.slice(0, 13)}_${u.id}`;
+        taken.add(name);
+        con.prepare('UPDATE users SET full_name=?,name=? WHERE id=?').run(u.name, name, u.id);
+      }
+      con.prepare('INSERT INTO migrations VALUES(10,?)').run(Math.floor(Date.now() / 1000));
     }
     con.exec('COMMIT');
   } catch (error) {

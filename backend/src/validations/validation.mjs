@@ -74,6 +74,13 @@ export function newPassword(value) {
     );
   return v;
 }
+// Public usernames (users.name): stored lowercase, so uniqueness ignores case.
+export function username(value) {
+  const v = text(value, 'Username', 3, 20).toLowerCase();
+  if (!/^[a-z0-9_]+$/.test(v))
+    throw new Problem('Usernames use 3 to 20 letters, numbers, or underscores, with no spaces.');
+  return v;
+}
 export function password(value) {
   if (typeof value !== 'string' || value.length < 12 || value.length > 128)
     throw new Problem('Use a password of 12 to 128 characters.');

@@ -102,9 +102,9 @@ try {
     existing.exec(schema);
     existing
       .prepare(
-        "INSERT INTO users(id,name,email,hash,created) VALUES(1,'Pilot User','pilot@example.test',?,1)",
+        "INSERT INTO users(id,name,email,hash,created) VALUES(1,'Pilot User','pilot@example.test',?,1),(2,'Pilot User!','pilot2@example.test',?,1),(3,'Deleted member','deleted-3@deleted.invalid','!',1)",
       )
-      .run(hash);
+      .run(hash, hash);
     existing.exec(
       "INSERT INTO posts VALUES(7,1,'Existing question','Existing problem description','General','published',1); INSERT INTO media VALUES('existing.webp',1,'public','image/webp',42,1); INSERT INTO migrations VALUES(1,1);",
     );
@@ -129,6 +129,19 @@ try {
       assert.equal(db().prepare('SELECT count(*) AS n FROM media').get().n, 2);
       assert.equal(db().prepare('SELECT count(*) AS n FROM migrations WHERE version=3').get().n, 1);
       assert.equal(db().prepare('SELECT count(*) AS n FROM announcements').get().n, 0);
+      // Version 10: display names become private full names and public usernames are derived.
+      assert.deepEqual(
+        db()
+          .prepare('SELECT name,full_name FROM users ORDER BY id')
+          .all()
+          .map((u) => [u.name, u.full_name]),
+        [
+          ['pilotuser', 'Pilot User'],
+          ['pilotuser_2', 'Pilot User!'],
+          ['Deleted member', ''],
+        ],
+      );
+      assert.equal(db().prepare('SELECT photos FROM posts WHERE id=7').get().photos, '[]');
       db().exec("INSERT INTO media VALUES('announcement.webp',1,'announcement','image/webp',21,1)");
     } finally {
       closeDatabases();

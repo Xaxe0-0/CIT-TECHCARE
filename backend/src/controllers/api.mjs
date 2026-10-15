@@ -495,12 +495,13 @@ async function get(path, url, me, request) {
     const pattern = '%' + query.replace(/[!%_]/g, (character) => '!' + character) + '%';
     const rows = query
       ? await all(
-          `SELECT id,name,email,role,verified,suspended FROM users WHERE name LIKE ? ESCAPE '!' OR email LIKE ? ESCAPE '!' ORDER BY name COLLATE NOCASE,id LIMIT 21 OFFSET ${page.offset}`,
+          `SELECT id,name,full_name,email,role,verified,suspended FROM users WHERE name LIKE ? ESCAPE '!' OR full_name LIKE ? ESCAPE '!' OR email LIKE ? ESCAPE '!' ORDER BY name COLLATE NOCASE,id LIMIT 21 OFFSET ${page.offset}`,
+          pattern,
           pattern,
           pattern,
         )
       : await all(
-          `SELECT id,name,email,role,verified,suspended FROM users WHERE role IN ('admin','moderator') ORDER BY role,name COLLATE NOCASE,id LIMIT 21 OFFSET ${page.offset}`,
+          `SELECT id,name,full_name,email,role,verified,suspended FROM users WHERE role IN ('admin','moderator') ORDER BY role,name COLLATE NOCASE,id LIMIT 21 OFFSET ${page.offset}`,
         );
     return json(paginated(rows, 'users', page));
   }
@@ -568,7 +569,8 @@ async function post(path, d, me, request) {
     );
   }
   if (path === 'register') {
-    const name = v.text(d.name, 'Display name', 2, 80),
+    const name = v.username(d.name),
+      fullName = v.text(d.full_name, 'Full name', 2, 80),
       email = v.allowedEmail(v.email(d.email)),
       password = v.newPassword(d.password);
     if (await one('SELECT id FROM users WHERE email=?', email))
@@ -576,6 +578,11 @@ async function post(path, d, me, request) {
         'Registration cannot be completed with these details. Try signing in or recovering your account.',
         409,
       );
+    // ponytail: uniqueness is checked here, not by a unique key (deleted accounts all share
+    // "Deleted member"); two sign-ups racing for one username could both pass. Add a unique
+    // index on a separate username column if that ever matters.
+    if (await one('SELECT id FROM users WHERE name=?', name))
+      throw new Problem('That username is taken. Try another one.', 409);
     // Offline SQLite tests use reserved example.test addresses, which have no mail server.
     if (useMySQL()) await v.deliverable(email);
     const code = String(randomInt(1000000)).padStart(6, '0');
@@ -595,8 +602,9 @@ async function post(path, d, me, request) {
       codeHash = passwordHash(code);
     await transaction(async () => {
       const result = await run(
-        'INSERT INTO users(name,email,hash,created) VALUES(?,?,?,?)',
+        'INSERT INTO users(name,full_name,email,hash,created) VALUES(?,?,?,?,?)',
         name,
+        fullName,
         email,
         hash,
         time,
@@ -798,17 +806,22 @@ async function post(path, d, me, request) {
   );
   if (path === 'vote') return json(await changeVote(d, me));
   if (path === 'profile') {
-    const name = v.text(d.name, 'Display name', 2, 80),
+    const name = v.username(d.name),
+      // Saving without a full name keeps the stored one (older and script-created accounts may have none).
+      fullName = d.full_name === undefined ? me.full_name : v.text(d.full_name, 'Full name', 2, 80),
       bio = v.text(d.bio || '', 'Bio', 0, 400),
       visibility = v.choice(
         d.visibility || me.visibility,
         ['public', 'private'],
         'profile visibility',
       );
+    if (name !== me.name && (await one('SELECT id FROM users WHERE name=? AND id<>?', name, me.id)))
+      throw new Problem('That username is taken. Try another one.', 409);
     const avatar = d.picture ? await saveMedia(d.picture, me.id, 'profile') : me.avatar;
     await run(
-      'UPDATE users SET name=?,bio=?,visibility=?,avatar=? WHERE id=?',
+      'UPDATE users SET name=?,full_name=?,bio=?,visibility=?,avatar=? WHERE id=?',
       name,
+      fullName,
       bio,
       visibility,
       avatar,

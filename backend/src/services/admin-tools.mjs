@@ -89,13 +89,16 @@ const exportsByName = {
   },
   users: {
     roles: ['admin'],
-    header: 'id,name,email,role,verified,suspended,joined',
+    header: 'id,username,full_name,email,role,verified,suspended,joined',
     rows: async () =>
       (
-        await all('SELECT id,name,email,role,verified,suspended,created FROM users ORDER BY id')
+        await all(
+          'SELECT id,name,full_name,email,role,verified,suspended,created FROM users ORDER BY id',
+        )
       ).map((r) => [
         r.id,
         r.name,
+        r.full_name,
         r.email,
         r.role,
         yes(r.verified),

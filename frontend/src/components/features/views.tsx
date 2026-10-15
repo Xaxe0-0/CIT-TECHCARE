@@ -359,7 +359,7 @@ function Feedback() {
           <LockKey size={29} weight="regular" />
           <h3>Shared privately with the team</h3>
           <p>
-            Your feedback and display name are visible only to moderators and administrators for
+            Your feedback and username are visible only to moderators and administrators for
             evaluation and follow-up.
           </p>
           <p>It is not posted publicly and is not anonymous.</p>
@@ -378,7 +378,7 @@ function Profile() {
   return (
     <>
       <PageHeading
-        title={`Welcome back, ${user!.name.split(' ')[0]}`}
+        title={`Welcome back, ${(user!.full_name || user!.name).split(' ')[0]}`}
         description="Your profile, your connections, and the questions you’re working through."
         action={
           <button className="button primary" onClick={ask}>
@@ -405,7 +405,23 @@ function Profile() {
               notify('Profile updated.');
             }}
           >
-            <Field label="Display name" name="name" min={2} max={80} value={user!.name} />
+            <Field
+              label="Username"
+              name="name"
+              min={3}
+              max={20}
+              pattern="[A-Za-z0-9_]{3,20}"
+              value={user!.name}
+              hint="3 to 20 letters, numbers, or underscores, with no spaces. This is the only name other members see."
+            />
+            <Field
+              label="Full name"
+              name="full_name"
+              min={2}
+              max={80}
+              value={user!.full_name || ''}
+              hint="Kept private: only you and TechCare administrators can see it."
+            />
             <Select
               label="Profile visibility"
               name="visibility"
@@ -413,8 +429,8 @@ function Profile() {
               options={['public', 'private']}
             />
             <p className="form-hint">
-              Private hides your bio and picture from non-friends. Your display name and approved
-              public questions remain visible.
+              Private hides your bio and picture from non-friends. Your username and approved public
+              questions remain visible.
             </p>
             <TextArea label="About me" name="bio" max={400} value={user!.bio} required={false} />
             <Upload key={saves} name="picture" label="Profile picture" />
@@ -869,7 +885,10 @@ function AdminAppSettings() {
                 <Avatar user={{ name: u.name, avatar: '' }} />
                 <div>
                   <strong>{u.name}</strong>
-                  <small>{u.email}</small>
+                  <small>
+                    {u.full_name ? u.full_name + ' · ' : ''}
+                    {u.email}
+                  </small>
                 </div>
                 <Badge>{u.role}</Badge>
                 {!!u.suspended && <Badge tone="danger">Suspended</Badge>}

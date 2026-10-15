@@ -90,7 +90,7 @@ export function AskQuestionPage() {
             )}
             <QuestionPhoto onBusyChange={setPhotoBusy} />
             <p className="form-hint">
-              Your display name, approved question, and attached photo will be public. Leave out
+              Your username, approved question, and attached photo will be public. Leave out
               passwords, contact details, faces, and other private information.
             </p>
           </Form>

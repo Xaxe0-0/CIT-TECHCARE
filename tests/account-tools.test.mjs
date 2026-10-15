@@ -305,7 +305,7 @@ try {
     assert.equal((await call('users.csv', null, sessions.moderator)).status, 403);
     assert.equal((await call('nothing.csv', null, sessions.admin)).status, 404);
     const users = (await call('users.csv', null, sessions.admin)).data;
-    assert.ok(users.startsWith('id,name,email,role')); // text() drops the Excel byte-order mark
+    assert.ok(users.startsWith('id,username,full_name,email,role')); // text() drops the Excel byte-order mark
     assert.ok(users.includes('other@example.test'));
     assert.ok(!/\$2[aby]\$|scrypt|hash/i.test(users), 'password hashes never leave the server');
     for (const name of ['discussions', 'lost-found', 'reports', 'audit'])
@@ -364,12 +364,39 @@ try {
     process.env.TECHCARE_EMAIL_DOMAINS = 'uls.edu.ph';
     t.after(() => delete process.env.TECHCARE_EMAIL_DOMAINS);
     const join = (email) =>
-      call('register', { name: 'School Student', email, password: 'Strong-enough-pass-1' });
+      call('register', {
+        name: 'school_student',
+        full_name: 'School Student',
+        email,
+        password: 'Strong-enough-pass-1',
+      });
     const outside = await join('student@gmail.com');
     assert.equal(outside.status, 400);
     assert.match(outside.data.error, /ending in @uls\.edu\.ph/);
     assert.equal((await join('student@uls.edu.ph')).status, 201);
     assert.deepEqual((await call('settings')).data.emailDomains, ['uls.edu.ph']);
+  });
+
+  await test('public names are unique usernames; the full name stays private', async () => {
+    const join = (name, email) =>
+      call('register', {
+        name,
+        full_name: 'Ana Reyes Santos',
+        email,
+        password: 'Strong-enough-pass-1',
+      });
+    assert.match((await join('Ana Reyes', 'ana1@example.test')).data.error, /no spaces/);
+    assert.equal((await join('Ana_R', 'ana2@example.test')).status, 201);
+    const again = await join('ana_r', 'ana3@example.test');
+    assert.equal(again.status, 409, 'usernames are unique regardless of case');
+    assert.deepEqual(
+      { ...one("SELECT name,full_name FROM users WHERE email='ana2@example.test'") },
+      { name: 'ana_r', full_name: 'Ana Reyes Santos' },
+    );
+    run("UPDATE users SET verified=1 WHERE email='ana2@example.test'");
+    const members = JSON.stringify((await call('members')).data.members);
+    assert.ok(members.includes('"ana_r"') && !members.includes('Ana Reyes Santos'));
+    assert.equal((await call('profile', { name: 'ANA_R' }, sessions.other)).status, 409);
   });
 
   await test('three wrong passwords lock sign-in for 15 minutes', async () => {

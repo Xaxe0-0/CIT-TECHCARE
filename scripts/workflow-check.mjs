@@ -104,26 +104,28 @@ try {
   await expect(member.getByRole('dialog')).toHaveCount(0);
   let dialog = member.locator('.auth-page');
   await dialog.getByRole('button', { name: 'Create Account', exact: true }).click();
-  await expect(dialog.getByLabel('Display name', { exact: true })).toBeFocused();
-  await expect(dialog.getByText('Please enter display name.', { exact: true })).toBeVisible();
+  await expect(dialog.getByLabel('Full name', { exact: true })).toBeFocused();
+  await expect(dialog.getByText('Please enter full name.', { exact: true })).toBeVisible();
   await dialog.getByLabel('Email address', { exact: true }).fill('incorrect');
-  await dialog.getByLabel('Password (12 to 128 characters)', { exact: true }).fill('short');
+  await dialog.getByLabel('Password', { exact: true }).fill('short');
   await dialog.getByRole('button', { name: 'Create Account', exact: true }).click();
   await expect(
     dialog.getByText('Enter a valid email address, such as name@example.com.'),
   ).toBeVisible();
-  await expect(
-    dialog.getByLabel('Password (12 to 128 characters)', { exact: true }),
-  ).toHaveAttribute('aria-invalid', 'true');
+  await expect(dialog.getByLabel('Password', { exact: true })).toHaveAttribute(
+    'aria-invalid',
+    'true',
+  );
   await member.screenshot({ path: 'artifacts/custom-input-errors-dark.png' });
   const errorScan = await new AxeBuilder({ page: member })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
     .analyze();
   expect(errorScan.violations).toEqual([]);
   pass('Custom required/email/length errors, accessible labels and first-error focus');
-  await dialog.getByLabel('Display name').fill('QA Student');
+  await dialog.getByLabel('Full name').fill('QA Student');
+  await dialog.getByLabel('Username').fill('qa_student');
   await dialog.getByLabel('Email address').fill('qa-student@example.test');
-  await dialog.getByLabel('Password (12 to 128 characters)', { exact: true }).fill(password);
+  await dialog.getByLabel('Password', { exact: true }).fill(password);
   await dialog.getByRole('button', { name: 'Create Account', exact: true }).click();
   await expect(dialog.getByRole('heading', { name: 'Verify Your Email' })).toBeVisible();
   await expect(member).toHaveURL(origin + '/verify');
