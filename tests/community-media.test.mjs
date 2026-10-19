@@ -408,6 +408,72 @@ try {
     assert.deepEqual(uploads(second), [0]);
   });
 
+  await test('staff remove questions and comments; they show as removed and replies stay', async () => {
+    const postId = Number(
+      run(
+        "INSERT INTO posts(user_id,title,body,category,status,created) VALUES(?,'Spammy question title','Buy cheap followers at my site now.','General','published',?)",
+        ids.member,
+        now(),
+      ).lastInsertRowid,
+    );
+    const comment = (
+      await call('comments', { post_id: postId, body: 'Rude comment here' }, sessions.other)
+    ).data.id;
+    const reply = (
+      await call(
+        'comments',
+        { post_id: postId, parent_id: comment, body: 'A reply that should stay.' },
+        sessions.member,
+      )
+    ).data.id;
+    await call(
+      'content-reports',
+      { kind: 'comment', id: comment, reason: 'Rude language' },
+      sessions.member,
+    );
+    const remove = (kind, id, who = sessions.admin) =>
+      call('moderate/remove', { kind, id, reason: 'Breaks the community rules' }, who);
+    assert.equal((await remove('comment', comment, sessions.member)).status, 403);
+    assert.equal((await remove('comment', comment)).status, 200);
+    assert.equal((await remove('comment', comment)).status, 409, 'already removed');
+    const thread = (await call(`comments?post=${postId}`)).data.comments;
+    assert.deepEqual(
+      { ...thread.find((c) => c.id === comment) },
+      { ...thread.find((c) => c.id === comment), body: '', deleted: 2 },
+    );
+    assert.ok(
+      one('SELECT 1 AS x FROM comments WHERE id=? AND deleted=0', reply),
+      'replies to a removed comment stay',
+    );
+    assert.equal(
+      one("SELECT resolved FROM content_reports WHERE kind='comment' AND target=?", comment)
+        .resolved,
+      1,
+    );
+    assert.ok(
+      one(
+        "SELECT 1 AS x FROM alerts WHERE user_id=? AND text LIKE '%removed your comment%'",
+        ids.other,
+      ),
+    );
+
+    assert.equal((await remove('post', postId)).status, 200);
+    const page = (await call('post?id=' + postId)).data.post;
+    assert.equal(page.removed, 1, 'the question page still opens');
+    assert.equal(page.title, '');
+    assert.ok(!(await call('posts')).data.posts.some((p) => p.id === postId), 'hidden from feed');
+    assert.equal(
+      (await call('comments', { post_id: postId, body: 'Late comment' }, sessions.other)).status,
+      404,
+      'no new comments on a removed question',
+    );
+    assert.match(
+      one("SELECT reason FROM audit WHERE action='remove' AND kind='post' AND target=?", postId)
+        .reason,
+      /Spammy question title/,
+    );
+  });
+
   await test('content reports are staff-only and removal revokes public access', async () => {
     assert.equal(
       (

@@ -146,7 +146,7 @@ const exportsByName = {
     rows: async () =>
       (
         await all(
-          `SELECT p.id,p.created,u.name,p.category,p.status,p.title,
+          `SELECT p.id,p.created,u.name,p.category,CASE WHEN p.removed=1 THEN 'removed' ELSE p.status END AS status,p.title,
             (SELECT COALESCE(SUM(value),0) FROM post_votes WHERE post_id=p.id) AS votes,
             (SELECT count(*) FROM comments WHERE post_id=p.id AND deleted=0) AS replies
            FROM posts p LEFT JOIN users u ON u.id=p.user_id ORDER BY p.id`,

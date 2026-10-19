@@ -31,6 +31,8 @@ export type Post = Partial<VoteState> & {
   // photo is the first (cover) photo; photos lists all of them, as a list or a JSON string.
   photo?: string;
   photos?: string[] | string;
+  // 1 when a moderator removed the question; its title and text are then empty.
+  removed?: number;
   id: number;
   title: string;
   body: string;
@@ -51,6 +53,7 @@ export type Reply = Partial<VoteState> & {
   replies?: number;
   replyTo?: string;
   own?: number;
+  // 1: removed by its author; 2: removed by a moderator.
   deleted?: number;
   revision?: number;
   id: number;

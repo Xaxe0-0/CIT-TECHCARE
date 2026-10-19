@@ -60,7 +60,7 @@ export function MyQuestion({ post: p, changed }: { post: Post; changed: () => vo
   return (
     <div className="own-question">
       <div>
-        <h3>{p.title}</h3>
+        <h3>{p.removed ? '[Removed by a moderator]' : p.title}</h3>
         <small>{date(p.created)}</small>
         <ReviewNote status={p.status} note={p.review_note} />
         <div className="own-actions">

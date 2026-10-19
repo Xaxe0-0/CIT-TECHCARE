@@ -348,3 +348,11 @@
     animation-duration: 2s;
   }
 }
+
+/* Content a moderator removed: shown in place, muted and italic, like forums do. */
+.removed-note,
+#main-content h1.removed-note {
+  color: var(--muted);
+  font-style: italic;
+  font-weight: 500;
+}

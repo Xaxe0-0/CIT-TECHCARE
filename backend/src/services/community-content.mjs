@@ -187,7 +187,7 @@ export async function saveComment(d, me) {
     throw new Problem('This comment changed. Refresh before editing again.', 409);
   const post = editing?.post_id || v.id(d.post_id);
   const validateParent = async () => {
-    if (!(await one("SELECT 1 FROM posts WHERE id=? AND status='published'", post)))
+    if (!(await one("SELECT 1 FROM posts WHERE id=? AND status='published' AND removed=0", post)))
       throw new Problem('Reply to a published discussion.', 404);
     const parentId = editing?.parent_id || (d.parent_id ? v.id(d.parent_id) : null);
     const parent = parentId ? await publishedComment(parentId) : null;
@@ -529,4 +529,56 @@ export async function communityPost(path, d, me) {
       message: action === 'remove' ? 'Content removed from public view.' : 'Report dismissed.',
     };
   }
+}
+
+// Staff remove a question or comment the way forums do: it stays in place as "[Removed by a
+// moderator]" so replies keep their context, but its text and photos are gone. The author is
+// told why, open reports on it close, and the activity log keeps the original title.
+export async function removeContent(d, me) {
+  requireUser(me, staff);
+  const kind = v.choice(d.kind, ['post', 'comment'], 'content type'),
+    id = v.id(d.id),
+    reason = v.text(d.reason || '', 'Reason', 0, 300);
+  const row =
+    kind === 'post'
+      ? await one(
+          "SELECT id,user_id,title,photos,removed AS gone FROM posts WHERE id=? AND status='published'",
+          id,
+        )
+      : await one(
+          "SELECT id,user_id,post_id,photo,deleted AS gone FROM comments WHERE id=? AND status='published'",
+          id,
+        );
+  if (!row) throw new Problem('Published content not found.', 404);
+  if (row.gone) throw new Problem('This has already been removed.', 409);
+  const link = kind === 'post' ? `/discussion/${id}` : `/discussion/${row.post_id}#comment-${id}`;
+  await transaction(async () => {
+    if (kind === 'post')
+      await run("UPDATE posts SET title='',body='',photo='',photos='[]',removed=1 WHERE id=?", id);
+    else
+      await run(
+        "UPDATE comments SET body='',photo='',deleted=2,revision=revision+1 WHERE id=?",
+        id,
+      );
+    await run('UPDATE content_reports SET resolved=1 WHERE kind=? AND target=?', kind, id);
+    await logActivity(
+      me.id,
+      'remove',
+      kind,
+      id,
+      (kind === 'post' ? `"${row.title}"` : 'Comment') + (reason ? ` — ${reason}` : ''),
+    );
+    if (row.user_id !== me.id)
+      await alert(
+        row.user_id,
+        `A moderator removed your ${kind === 'post' ? 'question' : 'comment'}${reason ? `: ${reason}` : '.'}`,
+        link,
+      );
+  });
+  if (kind === 'post')
+    for (const url of JSON.parse(row.photos || '[]')) await discardQuestionMedia(url, row.user_id);
+  else if (row.photo) await discardCommunityMedia(row.photo, row.user_id);
+  return {
+    message: kind === 'post' ? 'Question removed.' : 'Comment removed.',
+  };
 }

@@ -20,7 +20,7 @@ import {
   type Icon,
 } from '@phosphor-icons/react';
 import { useTechCare } from '@/context/techcare-context';
-import { ReportContent } from './community-extras';
+import { RemoveContent, ReportContent } from './community-extras';
 import { QuestionImage } from '../common/question-photo';
 import {
   Avatar,
@@ -407,9 +407,20 @@ export function DiscussionThread({ id }: { id: number }) {
               <article className="discussion-post full-question">
                 <Byline item={post} />
                 <Badge>{post.category}</Badge>
-                <h1>{post.title}</h1>
-                <p className="discussion-full-body">{post.body}</p>
-                <QuestionImage photo={post.photo} photos={post.photos} title={post.title} />
+                {post.removed ? (
+                  <>
+                    <h1 className="removed-note">[Removed by a moderator]</h1>
+                    <p className="muted">
+                      This question broke the community guidelines. Its comments are kept below.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h1>{post.title}</h1>
+                    <p className="discussion-full-body">{post.body}</p>
+                    <QuestionImage photo={post.photo} photos={post.photos} title={post.title} />
+                  </>
+                )}
                 <div className="discussion-actions">
                   <Votes kind="post" item={post} />
                   <a className="discussion-comments-link" href="#comments">
@@ -429,7 +440,12 @@ export function DiscussionThread({ id }: { id: number }) {
                   >
                     <LinkSimple size={18} /> Copy link
                   </button>
-                  <ReportContent kind="post" id={id} />
+                  {!post.removed && (
+                    <>
+                      <ReportContent kind="post" id={id} />
+                      <RemoveContent kind="post" id={id} />
+                    </>
+                  )}
                 </div>
               </article>
               <section
@@ -442,7 +458,9 @@ export function DiscussionThread({ id }: { id: number }) {
                 </h2>
                 <div className="comment-composer">
                   {notice && <Success>{notice}</Success>}
-                  {user ? (
+                  {post.removed ? (
+                    <p className="muted">This question was removed, so new comments are closed.</p>
+                  ) : user ? (
                     <CommentComposer
                       postId={id}
                       done={(message) => {
@@ -569,7 +587,9 @@ function CommentItem({
       <Byline item={c} />
       {c.replyTo && <small className="reply-to">Replying to {c.replyTo}</small>}
       {c.deleted ? (
-        <p className="muted">This comment was removed by its author.</p>
+        <p className="muted removed-note">
+          {c.deleted === 2 ? '[Removed by a moderator]' : 'This comment was removed by its author.'}
+        </p>
       ) : (
         <>
           <p className="preserve-lines">{c.body}</p>
@@ -593,6 +613,7 @@ function CommentItem({
               </>
             )}
             <ReportContent kind="comment" id={c.id} />
+            <RemoveContent kind="comment" id={c.id} />
           </div>
         </>
       )}
