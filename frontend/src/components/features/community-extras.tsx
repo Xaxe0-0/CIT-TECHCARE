@@ -40,6 +40,46 @@ export function ReportContent({ kind, id }: { kind: 'post' | 'comment'; id: numb
     </div>
   );
 }
+// Staff only: remove a question or comment in place, like forum moderators do. It then shows as
+// "[Removed by a moderator]"; the author is notified with the reason.
+export function RemoveContent({ kind, id }: { kind: 'post' | 'comment'; id: number }) {
+  const { user, notify, refresh } = useTechCare();
+  const [open, setOpen] = useState(false);
+  if (!user || !['admin', 'moderator'].includes(user.role)) return null;
+  return (
+    <div className="report-content">
+      <button className="text-button danger" type="button" onClick={() => setOpen(!open)}>
+        Remove
+      </button>
+      {open && (
+        <div className="inline-composer">
+          <Form
+            submit={kind === 'post' ? 'Remove question' : 'Remove comment'}
+            cancel={{ label: 'Keep it', onClick: () => setOpen(false) }}
+            onSubmit={async (values) => {
+              const r = await api<Result>('moderate/remove', { ...values, kind, id });
+              setOpen(false);
+              notify(r.message!);
+              refresh();
+            }}
+          >
+            <p className="form-hint">
+              Its text and photos are removed for everyone and it shows as “Removed by a moderator”.{' '}
+              {kind === 'post' ? 'Comments stay.' : 'Replies stay.'} The author is notified.
+            </p>
+            <TextArea
+              label="Reason (sent to the author)"
+              name="reason"
+              max={300}
+              required={false}
+              placeholder="e.g. Spam, or breaks the community guidelines"
+            />
+          </Form>
+        </div>
+      )}
+    </div>
+  );
+}
 export function ContentReports() {
   const { notify } = useTechCare();
   const result = useData<{

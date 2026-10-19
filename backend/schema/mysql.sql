@@ -1,4 +1,4 @@
--- TechCare MySQL 8.0.16+ schema (latest application schema, migration version 10).
+-- TechCare MySQL 8.0.16+ schema (latest application schema, migration version 11).
 -- Select the application database before applying this file.
 SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS posts (
   created BIGINT NOT NULL,
   photo VARCHAR(512) NOT NULL DEFAULT '',
   photos VARCHAR(2000) NOT NULL DEFAULT '[]',
+  removed TINYINT UNSIGNED NOT NULL DEFAULT 0,
   review_note VARCHAR(500) NOT NULL DEFAULT '',
   PRIMARY KEY (id),
   KEY post_status_time (status,created DESC,id DESC),
@@ -384,4 +385,4 @@ CREATE TABLE IF NOT EXISTS email_changes (
 INSERT IGNORE INTO migrations (version,applied)
 VALUES (1,UNIX_TIMESTAMP()),(2,UNIX_TIMESTAMP()),(3,UNIX_TIMESTAMP()),
        (4,UNIX_TIMESTAMP()),(5,UNIX_TIMESTAMP()),(6,UNIX_TIMESTAMP()),(7,UNIX_TIMESTAMP()),(8,UNIX_TIMESTAMP()),(9,UNIX_TIMESTAMP()),
-       (10,UNIX_TIMESTAMP());
+       (10,UNIX_TIMESTAMP()),(11,UNIX_TIMESTAMP());

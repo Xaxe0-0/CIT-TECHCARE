@@ -10,6 +10,7 @@ import {
   notifyReply,
   alert,
   LOST_FOUND_DAYS,
+  removeContent,
 } from '../services/community-content.mjs';
 import {
   changePassword,
@@ -297,7 +298,7 @@ async function get(path, url, me, request) {
     return json({
       ...paginated(
         await all(
-          `SELECT id,title,status,category,created,photo,review_note FROM posts WHERE user_id=? ORDER BY created DESC,id DESC LIMIT 21 OFFSET ${page.offset}`,
+          `SELECT id,title,status,category,created,photo,review_note,removed FROM posts WHERE user_id=? ORDER BY created DESC,id DESC LIMIT 21 OFFSET ${page.offset}`,
           me.id,
         ),
         'posts',
@@ -343,7 +344,7 @@ async function get(path, url, me, request) {
       category = url.searchParams.get('category') || '';
     if (category) v.choice(category, v.categories, 'category');
     const rows = await all(
-      `SELECT p.*,u.name,u.role,${publicAvatar},${voteColumns('post', 'p')},(SELECT count(*) FROM comments c LEFT JOIN comments root ON root.id=c.root_id WHERE c.post_id=p.id AND c.status='published' AND c.deleted=0 AND (root.id IS NULL OR root.status='published')) AS replies,CASE WHEN COALESCE((SELECT MAX(c.created) FROM comments c LEFT JOIN comments root ON root.id=c.root_id WHERE c.post_id=p.id AND c.status='published' AND c.deleted=0 AND (root.id IS NULL OR root.status='published')),p.created)>p.created THEN (SELECT MAX(c.created) FROM comments c LEFT JOIN comments root ON root.id=c.root_id WHERE c.post_id=p.id AND c.status='published' AND c.deleted=0 AND (root.id IS NULL OR root.status='published')) ELSE p.created END AS lastActivity FROM posts p JOIN users u ON p.user_id=u.id WHERE p.status='published' AND (p.title LIKE ? OR p.body LIKE ? OR p.category LIKE ?) AND (?='' OR p.category=?) ORDER BY ${sort === 'top' ? 'score DESC,' : ''}p.created DESC,p.id DESC LIMIT 21 OFFSET ${page.offset}`,
+      `SELECT p.*,u.name,u.role,${publicAvatar},${voteColumns('post', 'p')},(SELECT count(*) FROM comments c LEFT JOIN comments root ON root.id=c.root_id WHERE c.post_id=p.id AND c.status='published' AND c.deleted=0 AND (root.id IS NULL OR root.status='published')) AS replies,CASE WHEN COALESCE((SELECT MAX(c.created) FROM comments c LEFT JOIN comments root ON root.id=c.root_id WHERE c.post_id=p.id AND c.status='published' AND c.deleted=0 AND (root.id IS NULL OR root.status='published')),p.created)>p.created THEN (SELECT MAX(c.created) FROM comments c LEFT JOIN comments root ON root.id=c.root_id WHERE c.post_id=p.id AND c.status='published' AND c.deleted=0 AND (root.id IS NULL OR root.status='published')) ELSE p.created END AS lastActivity FROM posts p JOIN users u ON p.user_id=u.id WHERE p.status='published' AND p.removed=0 AND (p.title LIKE ? OR p.body LIKE ? OR p.category LIKE ?) AND (?='' OR p.category=?) ORDER BY ${sort === 'top' ? 'score DESC,' : ''}p.created DESC,p.id DESC LIMIT 21 OFFSET ${page.offset}`,
       me?.id || 0,
       ...Array(3).fill(`%${q}%`),
       category,
@@ -997,6 +998,7 @@ async function post(path, d, me, request) {
     ].includes(path)
   )
     return json(await communityPost(path, d, me));
+  if (path === 'moderate/remove') return json(await removeContent(d, me));
   if (path === 'moderate') {
     requireUser(me, staff);
     const kind = v.choice(d.kind, ['post', 'comment', 'report'], 'content type'),

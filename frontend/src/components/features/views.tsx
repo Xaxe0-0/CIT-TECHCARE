@@ -1084,6 +1084,7 @@ const actionNames: Record<string, string> = {
   delete: 'Deleted account',
   suspend: 'Suspended account',
   restore: 'Restored account',
+  remove: 'Removed content',
 };
 function ActivityLog() {
   const { version } = useTechCare();
