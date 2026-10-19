@@ -132,6 +132,8 @@ if not exist ".env.local" (
   echo !ERR!Settings are missing. Run this again and choose option 2.!RESET!
   goto fail
 )
+call :update_database
+if errorlevel 1 goto fail
 call :find_ollama
 if defined OLLAMA call :start_ollama
 echo.
@@ -152,7 +154,9 @@ if not errorlevel 1 (
   goto end
 )
 echo.
-echo !BLUE![1/5]!RESET! Checking the sharing settings and database...
+echo !BLUE![1/5]!RESET! Updating the database and checking the sharing settings...
+call :update_database
+if errorlevel 1 goto fail
 call node scripts\setup-sharing.mjs
 if errorlevel 1 goto fail
 set "PUBLIC_ORIGIN="
@@ -215,6 +219,16 @@ echo !WARN!TechCare stopped, and the tunnel was closed. Run option 3 again to sh
 goto fail
 
 rem ---------------------------------------------------------------- helpers
+rem Applies any new mysql-upgrade-N.sql after a git pull, so starting never fails with
+rem "MySQL schema is not at version N". Safe to repeat: it does nothing when up to date.
+:update_database
+call node scripts\setup-database.mjs
+if errorlevel 1 (
+  echo !ERR!The database could not be updated. Fix the message above, then try again.!RESET!
+  exit /b 1
+)
+exit /b 0
+
 :running
 set "RUNNING="
 for %%p in (3000 3100) do (

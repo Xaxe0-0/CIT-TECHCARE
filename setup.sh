@@ -11,6 +11,12 @@ else
   BLUE='' TEAL='' WARN='' ERR='' BOLD='' RESET=''
 fi
 step() { echo "${BLUE}$1${RESET} $2"; }
+# Applies any new mysql-upgrade-N.sql after a git pull, so starting never fails with
+# "MySQL schema is not at version N". Safe to repeat: it does nothing when up to date.
+update_database() {
+  node scripts/setup-database.mjs ||
+    fail "The database could not be updated. Fix the message above, then try again."
+}
 warn() { echo "${WARN}$*${RESET}"; }
 fail() { echo "${ERR}$*${RESET}"; exit 1; }
 # Reinstalling packages while TechCare runs breaks on files the server has open.
@@ -46,6 +52,7 @@ start_app() {
   if [ ! -d node_modules/@next/env ] || [ ! -f .env.local ]; then
     fail "TechCare is not set up yet. Run ./setup.sh 2 first."
   fi
+  update_database
   start_ollama
   echo
   echo "${TEAL}Starting TechCare.${RESET} Open ${BLUE}http://127.0.0.1:3000${RESET} in your browser when it says Ready."
@@ -126,7 +133,8 @@ share_online() {
     exit 0
   fi
   echo
-  step "[1/5]" "Checking the sharing settings and database..."
+  step "[1/5]" "Updating the database and checking the sharing settings..."
+  update_database
   node scripts/setup-sharing.mjs || exit 1
   origin=$(grep -E '^TECHCARE_ORIGIN=' .env.production.local | tail -n 1 | cut -d= -f2-)
   host=${origin#https://}
