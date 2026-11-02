@@ -1,6 +1,6 @@
 {
   "name": "techcare",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -32,8 +32,8 @@
     "@phosphor-icons/react": "^2.1.10",
     "@radix-ui/react-dialog": "^1.1.23",
     "mysql2": "^3.24.5",
-    "next": "^16.3.6",
-    "nodemailer": "^10.0.10",
+    "next": "^16.4.3",
+    "nodemailer": "^10.3.1",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "sharp": "^0.35.4",
